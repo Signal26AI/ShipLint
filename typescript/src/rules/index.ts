@@ -9,6 +9,12 @@ export * from './privacy/index.js';
 // Auth rules
 export * from './auth/index.js';
 
+// Metadata rules
+export * from './metadata/index.js';
+
+// Config rules
+export * from './config/index.js';
+
 // Base utilities
 export * from './base.js';
 
@@ -17,7 +23,12 @@ import { MissingCameraPurposeRule } from './privacy/missing-camera-purpose.js';
 import { MissingLocationPurposeRule } from './privacy/missing-location-purpose.js';
 import { LocationAlwaysUnjustifiedRule } from './privacy/location-always-unjustified.js';
 import { ATTTrackingMismatchRule } from './privacy/att-tracking-mismatch.js';
+import { MissingPhotoLibraryPurposeRule } from './privacy/missing-photo-library-purpose.js';
+import { MissingMicrophonePurposeRule } from './privacy/missing-microphone-purpose.js';
+import { MissingContactsPurposeRule } from './privacy/missing-contacts-purpose.js';
 import { ThirdPartyLoginNoSIWARule } from './auth/third-party-login-no-siwa.js';
+import { MissingPrivacyManifestRule } from './metadata/missing-privacy-manifest.js';
+import { ATSExceptionWithoutJustificationRule } from './config/ats-exception-without-justification.js';
 
 /**
  * All available rules
@@ -27,7 +38,12 @@ export const allRules: Rule[] = [
   MissingLocationPurposeRule,
   LocationAlwaysUnjustifiedRule,
   ATTTrackingMismatchRule,
+  MissingPhotoLibraryPurposeRule,
+  MissingMicrophonePurposeRule,
+  MissingContactsPurposeRule,
   ThirdPartyLoginNoSIWARule,
+  MissingPrivacyManifestRule,
+  ATSExceptionWithoutJustificationRule,
 ];
 
 /**

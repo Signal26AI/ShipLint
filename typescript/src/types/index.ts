@@ -31,6 +31,8 @@ export enum RuleCategory {
   Entitlements = 'entitlements',
   Performance = 'performance',
   Content = 'content',
+  Metadata = 'metadata',
+  Config = 'config',
 }
 
 /**
