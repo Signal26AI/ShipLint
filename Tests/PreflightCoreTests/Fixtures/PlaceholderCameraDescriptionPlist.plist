@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.example.placeholdercamera</string>
+    <key>CFBundleName</key>
+    <string>PlaceholderCameraApp</string>
+    <key>CFBundleDisplayName</key>
+    <string>Placeholder Camera App</string>
+    <key>MinimumOSVersion</key>
+    <string>15.0</string>
+    <!-- NSCameraUsageDescription has placeholder text -->
+    <key>NSCameraUsageDescription</key>
+    <string>TODO: Add camera description here</string>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arm64</string>
+    </array>
+</dict>
+</plist>

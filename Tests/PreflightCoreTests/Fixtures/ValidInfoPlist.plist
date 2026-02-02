@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.example.validapp</string>
+    <key>CFBundleName</key>
+    <string>ValidApp</string>
+    <key>CFBundleDisplayName</key>
+    <string>Valid App</string>
+    <key>MinimumOSVersion</key>
+    <string>15.0</string>
+    <key>NSCameraUsageDescription</key>
+    <string>We need access to your camera to take photos for your profile picture and to scan QR codes for quick login.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>We need access to your photo library to let you choose a profile picture.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>We use your location to show nearby stores and provide local recommendations.</string>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arm64</string>
+    </array>
+</dict>
+</plist>

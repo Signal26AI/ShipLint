@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.example.missingcamera</string>
+    <key>CFBundleName</key>
+    <string>MissingCameraApp</string>
+    <key>CFBundleDisplayName</key>
+    <string>Missing Camera App</string>
+    <key>MinimumOSVersion</key>
+    <string>15.0</string>
+    <!-- NSCameraUsageDescription intentionally missing -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>We need access to your photo library.</string>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arm64</string>
+    </array>
+</dict>
+</plist>
