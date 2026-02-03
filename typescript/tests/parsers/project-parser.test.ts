@@ -923,5 +923,50 @@ buildSettings = {
       // The recursive search with sibling exclusion should find AppA/Info.plist
       expect(discovery.infoPlistPath).toBe(path.join(appADir, 'Info.plist'));
     });
+
+    it('P2-C Regression: should NOT pick root entitlements when monorepo has multiple xcodeprojs', () => {
+      // Regression test: Root-level entitlements with sibling xcodeprojs
+      // If root directory contains multiple .xcodeproj bundles, filter out root-level entitlements
+      
+      // Create monorepo structure:
+      // monorepo/
+      //   Shared.entitlements  <- Root entitlements (should be SKIPPED)
+      //   AppA.xcodeproj/      <- First project
+      //   AppB.xcodeproj/      <- Second project
+      //   AppA/AppA.entitlements <- AppA's entitlements
+      //   AppB/AppB.entitlements <- AppB's entitlements
+      
+      // Create root entitlements (this is the problem case - should NOT be picked)
+      fs.writeFileSync(path.join(tempDir, 'Shared.entitlements'), '<?xml version="1.0"?><root/>');
+      
+      // Create AppA.xcodeproj at root level (without valid CODE_SIGN_ENTITLEMENTS to force fallback)
+      const appAXcode = path.join(tempDir, 'AppA.xcodeproj');
+      fs.mkdirSync(appAXcode);
+      fs.writeFileSync(path.join(appAXcode, 'project.pbxproj'), '// no CODE_SIGN_ENTITLEMENTS');
+      
+      // Create AppB.xcodeproj at root level
+      const appBXcode = path.join(tempDir, 'AppB.xcodeproj');
+      fs.mkdirSync(appBXcode);
+      fs.writeFileSync(path.join(appBXcode, 'project.pbxproj'), '// no CODE_SIGN_ENTITLEMENTS');
+      
+      // Create AppA target directory with entitlements
+      const appADir = path.join(tempDir, 'AppA');
+      fs.mkdirSync(appADir);
+      fs.writeFileSync(path.join(appADir, 'AppA.entitlements'), '<?xml version="1.0"?><appA/>');
+      
+      // Create AppB target directory with entitlements
+      const appBDir = path.join(tempDir, 'AppB');
+      fs.mkdirSync(appBDir);
+      fs.writeFileSync(path.join(appBDir, 'AppB.entitlements'), '<?xml version="1.0"?><appB/>');
+      
+      // Scan from root (should pick first xcodeproj: AppA)
+      const discovery = discoverProject(tempDir);
+      
+      // P2-C FIX: Should NOT pick root Shared.entitlements because tempDir has multiple xcodeprojs
+      // Should instead find AppA/AppA.entitlements via recursive search (filtered)
+      expect(discovery.entitlementsPath).not.toBe(path.join(tempDir, 'Shared.entitlements'));
+      // The recursive search with monorepo filter should find AppA/AppA.entitlements
+      expect(discovery.entitlementsPath).toBe(path.join(appADir, 'AppA.entitlements'));
+    });
   });
 });

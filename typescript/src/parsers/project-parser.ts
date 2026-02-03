@@ -554,6 +554,9 @@ function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery, target
  * to avoid picking up entitlements from sibling projects in monorepos
  * 
  * P2-B FIX: Excludes directories containing a different .xcodeproj (sibling projects)
+ * 
+ * P2-C FIX: If basePath contains multiple .xcodeproj bundles (monorepo), filter out
+ * root-level entitlements files to prevent selecting sibling project entitlements
  */
 function discoverEntitlements(basePath: string, discovery: ProjectDiscovery, targetName?: string): void {
   // Get the current xcodeproj path for sibling exclusion
@@ -573,8 +576,19 @@ function discoverEntitlements(basePath: string, discovery: ProjectDiscovery, tar
     }
   }
   
+  // P2-C FIX: Check if basePath has multiple xcodeprojs (monorepo indicator)
+  // This prevents picking up root-level entitlements from sibling projects
+  const isMonorepoRoot = hasMultipleXcodeprojs(basePath);
+
   // P2-B FIX: Recursive search with sibling project exclusion
-  const entitlements = findFilesRecursive(basePath, (name) => name.endsWith('.entitlements'), findOptions);
+  let entitlements = findFilesRecursive(basePath, (name) => name.endsWith('.entitlements'), findOptions);
+  
+  // P2-C FIX: If monorepo root, filter out root-level entitlements files
+  // (recursive search finds files in basePath directory as well)
+  if (isMonorepoRoot && entitlements.length > 0) {
+    entitlements = entitlements.filter(p => path.dirname(path.resolve(p)) !== path.resolve(basePath));
+  }
+  
   if (entitlements.length > 0) {
     // Prefer shorter paths (closer to root)
     entitlements.sort((a, b) => a.split(path.sep).length - b.split(path.sep).length);
