@@ -61,16 +61,43 @@ export function getRule(id: string): Rule | undefined {
 }
 
 /**
- * Get rules by IDs (returns all if no IDs specified)
+ * Result of rule lookup with validation info
  */
-export function getRules(ids?: string[]): Rule[] {
+export interface RuleLookupResult {
+  rules: Rule[];
+  unknownIds: string[];
+}
+
+/**
+ * Get rules by IDs with validation (returns all if no IDs specified)
+ * Returns both found rules and list of unknown IDs for validation
+ */
+export function getRulesWithValidation(ids?: string[]): RuleLookupResult {
   if (!ids || ids.length === 0) {
-    return allRules;
+    return { rules: allRules, unknownIds: [] };
   }
   
-  return ids
-    .map(id => ruleRegistry.get(id))
-    .filter((rule): rule is Rule => rule !== undefined);
+  const rules: Rule[] = [];
+  const unknownIds: string[] = [];
+  
+  for (const id of ids) {
+    const rule = ruleRegistry.get(id);
+    if (rule) {
+      rules.push(rule);
+    } else {
+      unknownIds.push(id);
+    }
+  }
+  
+  return { rules, unknownIds };
+}
+
+/**
+ * Get rules by IDs (returns all if no IDs specified)
+ * @deprecated Use getRulesWithValidation for proper error handling
+ */
+export function getRules(ids?: string[]): Rule[] {
+  return getRulesWithValidation(ids).rules;
 }
 
 /**
