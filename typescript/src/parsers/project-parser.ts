@@ -29,6 +29,8 @@ export interface ProjectDiscovery {
   isWorkspace: boolean;
   /** P1/P2: All projects found in workspace (when applicable) */
   workspaceProjects?: string[];
+  /** P2 FIX: Target name from pbxproj parsing (for scoped fallback discovery) */
+  targetName?: string;
 }
 
 /**
@@ -219,6 +221,9 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
       
       // P2 FIX: Try to get explicit artifact paths from pbxproj
       const artifacts = parsePbxprojForArtifacts(pbxprojPath, basePath);
+      if (artifacts.targetName) {
+        discovery.targetName = artifacts.targetName;
+      }
       if (artifacts.infoPlistPath) {
         discovery.infoPlistPath = artifacts.infoPlistPath;
       }
@@ -228,11 +233,12 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
     }
     
     // Fall back to directory search if artifacts not found via parsing
+    // P2 FIX: Pass targetName to scope the search and prevent monorepo bleeding
     if (!discovery.infoPlistPath) {
-      discoverInfoPlist(basePath, discovery);
+      discoverInfoPlist(basePath, discovery, discovery.targetName);
     }
     if (!discovery.entitlementsPath) {
-      discoverEntitlements(basePath, discovery);
+      discoverEntitlements(basePath, discovery, discovery.targetName);
     }
     
     return discovery;
@@ -263,6 +269,9 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
           
           // P2 FIX: Get artifacts from pbxproj
           const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(mainProject));
+          if (artifacts.targetName) {
+            discovery.targetName = artifacts.targetName;
+          }
           if (artifacts.infoPlistPath) {
             discovery.infoPlistPath = artifacts.infoPlistPath;
           }
@@ -291,6 +300,9 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
           
           // P2 FIX: Try to get artifacts from pbxproj
           const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(xcodeprojPath));
+          if (artifacts.targetName) {
+            discovery.targetName = artifacts.targetName;
+          }
           if (artifacts.infoPlistPath) {
             discovery.infoPlistPath = artifacts.infoPlistPath;
           }
@@ -303,12 +315,13 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
     }
     
     // P2 FIX: Search for artifacts within the project scope, not the entire basePath
+    // Pass targetName to scope the search and prevent monorepo bleeding
     const artifactSearchDir = discovery.projectScopeDir || basePath;
     if (!discovery.infoPlistPath) {
-      discoverInfoPlist(artifactSearchDir, discovery);
+      discoverInfoPlist(artifactSearchDir, discovery, discovery.targetName);
     }
     if (!discovery.entitlementsPath) {
-      discoverEntitlements(artifactSearchDir, discovery);
+      discoverEntitlements(artifactSearchDir, discovery, discovery.targetName);
     }
     
     return discovery;
@@ -341,6 +354,9 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
           
           // P2 FIX: Get artifacts from pbxproj
           const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(mainProject));
+          if (artifacts.targetName) {
+            discovery.targetName = artifacts.targetName;
+          }
           if (artifacts.infoPlistPath) {
             discovery.infoPlistPath = artifacts.infoPlistPath;
           }
@@ -370,6 +386,9 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
         
         // P2 FIX: Try to get artifacts from pbxproj
         const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(xcodeprojPath));
+        if (artifacts.targetName) {
+          discovery.targetName = artifacts.targetName;
+        }
         if (artifacts.infoPlistPath) {
           discovery.infoPlistPath = artifacts.infoPlistPath;
         }
@@ -382,12 +401,13 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
   }
   
   // P2 FIX: Search for artifacts within the project scope to avoid monorepo mixing
+  // Pass targetName to scope the search and prevent monorepo bleeding
   const artifactSearchDir = discovery.projectScopeDir || basePath;
   if (!discovery.infoPlistPath) {
-    discoverInfoPlist(artifactSearchDir, discovery);
+    discoverInfoPlist(artifactSearchDir, discovery, discovery.targetName);
   }
   if (!discovery.entitlementsPath) {
-    discoverEntitlements(artifactSearchDir, discovery);
+    discoverEntitlements(artifactSearchDir, discovery, discovery.targetName);
   }
   
   return discovery;
@@ -396,8 +416,31 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
 /**
  * Discovers Info.plist in project directory (recursive)
  * This is the fallback when pbxproj parsing doesn't yield a path
+ * 
+ * P2 FIX: If targetName is provided, first try searching only in the target's subdirectory
+ * to avoid picking up Info.plist from sibling projects in monorepos
  */
-function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery): void {
+function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery, targetName?: string): void {
+  // P2 FIX: If we have a target name, first try the target-specific subdirectory
+  if (targetName) {
+    const targetDir = path.join(basePath, targetName);
+    if (fs.existsSync(targetDir) && fs.statSync(targetDir).isDirectory()) {
+      // Check target root first
+      const targetPlist = path.join(targetDir, 'Info.plist');
+      if (fs.existsSync(targetPlist)) {
+        discovery.infoPlistPath = targetPlist;
+        return;
+      }
+      // Recursive search within target directory only
+      const plists = findFilesRecursive(targetDir, (name) => name === 'Info.plist');
+      if (plists.length > 0) {
+        plists.sort((a, b) => a.split(path.sep).length - b.split(path.sep).length);
+        discovery.infoPlistPath = plists[0];
+        return;
+      }
+    }
+  }
+  
   // First check root
   const rootPlist = path.join(basePath, 'Info.plist');
   if (fs.existsSync(rootPlist)) {
@@ -405,7 +448,7 @@ function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery): void 
     return;
   }
   
-  // Recursive search
+  // Recursive search (fallback when target-specific search fails)
   const plists = findFilesRecursive(basePath, (name) => name === 'Info.plist');
   if (plists.length > 0) {
     // Prefer shorter paths (closer to root)
@@ -417,8 +460,25 @@ function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery): void 
 /**
  * Discovers entitlements file in project directory (recursive)
  * This is the fallback when pbxproj parsing doesn't yield a path
+ * 
+ * P2 FIX: If targetName is provided, first try searching only in the target's subdirectory
+ * to avoid picking up entitlements from sibling projects in monorepos
  */
-function discoverEntitlements(basePath: string, discovery: ProjectDiscovery): void {
+function discoverEntitlements(basePath: string, discovery: ProjectDiscovery, targetName?: string): void {
+  // P2 FIX: If we have a target name, first try the target-specific subdirectory
+  if (targetName) {
+    const targetDir = path.join(basePath, targetName);
+    if (fs.existsSync(targetDir) && fs.statSync(targetDir).isDirectory()) {
+      const entitlements = findFilesRecursive(targetDir, (name) => name.endsWith('.entitlements'));
+      if (entitlements.length > 0) {
+        entitlements.sort((a, b) => a.split(path.sep).length - b.split(path.sep).length);
+        discovery.entitlementsPath = entitlements[0];
+        return;
+      }
+    }
+  }
+  
+  // Recursive search (fallback when target-specific search fails)
   const entitlements = findFilesRecursive(basePath, (name) => name.endsWith('.entitlements'));
   if (entitlements.length > 0) {
     // Prefer shorter paths (closer to root)

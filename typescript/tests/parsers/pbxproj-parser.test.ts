@@ -115,6 +115,44 @@ describe('pbxproj-parser', () => {
       const targets = parsePbxprojTargets('');
       expect(targets).toHaveLength(0);
     });
+
+    // P2 FIX: Lowercase hex ID tests
+    it('should parse targets with lowercase hex IDs', () => {
+      const content = `
+/* Begin PBXNativeTarget section */
+    a1b2c3d4e5f6a1b2c3d4e5f6 /* MyApp */ = {
+      isa = PBXNativeTarget;
+      buildConfigurationList = d1e2f3a4b5c6d1e2f3a4b5c6;
+      name = MyApp;
+      productType = "com.apple.product-type.application";
+    };
+/* End PBXNativeTarget section */`;
+
+      const targets = parsePbxprojTargets(content);
+
+      expect(targets).toHaveLength(1);
+      expect(targets[0].id).toBe('a1b2c3d4e5f6a1b2c3d4e5f6');
+      expect(targets[0].name).toBe('MyApp');
+      expect(targets[0].buildConfigurationListId).toBe('d1e2f3a4b5c6d1e2f3a4b5c6');
+    });
+
+    it('should parse targets with mixed case hex IDs', () => {
+      const content = `
+/* Begin PBXNativeTarget section */
+    A1b2C3d4E5f6A1b2C3d4E5f6 /* MyApp */ = {
+      isa = PBXNativeTarget;
+      buildConfigurationList = D1e2F3a4B5c6D1e2F3a4B5c6;
+      name = MyApp;
+      productType = "com.apple.product-type.application";
+    };
+/* End PBXNativeTarget section */`;
+
+      const targets = parsePbxprojTargets(content);
+
+      expect(targets).toHaveLength(1);
+      expect(targets[0].id).toBe('A1b2C3d4E5f6A1b2C3d4E5f6');
+      expect(targets[0].buildConfigurationListId).toBe('D1e2F3a4B5c6D1e2F3a4B5c6');
+    });
   });
 
   describe('getMainAppTarget', () => {
@@ -261,6 +299,50 @@ describe('pbxproj-parser', () => {
     it('should clean up double slashes', () => {
       expect(normalizeXcodePath('$(SRCROOT)//Info.plist')).toBe('Info.plist');
     });
+
+    // P2 FIX: Nested variable expansion tests
+    it('should handle nested variable expansion where PRODUCT_NAME equals TARGET_NAME', () => {
+      // Common pattern: PRODUCT_NAME = $(TARGET_NAME)
+      // Path: $(PRODUCT_NAME)/Info.plist where PRODUCT_NAME=$(TARGET_NAME)
+      // First pass: $(TARGET_NAME)/Info.plist
+      // Second pass: MyApp/Info.plist
+      expect(normalizeXcodePath('$(PRODUCT_NAME)/Info.plist', { 
+        targetName: 'MyApp', 
+        productName: '$(TARGET_NAME)' 
+      })).toBe('MyApp/Info.plist');
+    });
+
+    it('should handle nested variable expansion with ${} syntax', () => {
+      expect(normalizeXcodePath('${PRODUCT_NAME}/Info.plist', { 
+        targetName: 'MyApp', 
+        productName: '${TARGET_NAME}' 
+      })).toBe('MyApp/Info.plist');
+    });
+
+    it('should handle multiple levels of nested expansion', () => {
+      // Even though productName points to targetName, it resolves
+      expect(normalizeXcodePath('$(SRCROOT)/$(PRODUCT_NAME)/Info.plist', { 
+        targetName: 'MyApp', 
+        productName: '$(TARGET_NAME)' 
+      })).toBe('MyApp/Info.plist');
+    });
+
+    // P2 FIX: Quote stripping tests
+    it('should strip surrounding double quotes from path', () => {
+      expect(normalizeXcodePath('"My App/Info.plist"')).toBe('My App/Info.plist');
+    });
+
+    it('should strip surrounding single quotes from path', () => {
+      expect(normalizeXcodePath("'My App/Info.plist'")).toBe('My App/Info.plist');
+    });
+
+    it('should handle quoted paths with variables', () => {
+      expect(normalizeXcodePath('"$(SRCROOT)/My App/Info.plist"')).toBe('My App/Info.plist');
+    });
+
+    it('should not strip quotes that are not at both ends', () => {
+      expect(normalizeXcodePath('My "App"/Info.plist')).toBe('My "App"/Info.plist');
+    });
   });
 
   describe('parseBuildConfigurations', () => {
@@ -297,6 +379,26 @@ describe('pbxproj-parser', () => {
       expect(release?.name).toBe('Release');
       expect(release?.buildSettings.CODE_SIGN_ENTITLEMENTS).toBe('MyApp/MyApp.entitlements');
     });
+
+    // P2 FIX: Lowercase hex ID test
+    it('should parse configs with lowercase hex IDs', () => {
+      const content = `
+/* Begin XCBuildConfiguration section */
+    a1a1a1a1a1a1a1a1a1a1a1a1 /* Debug */ = {
+      isa = XCBuildConfiguration;
+      buildSettings = {
+        INFOPLIST_FILE = "MyApp/Info.plist";
+      };
+      name = Debug;
+    };
+/* End XCBuildConfiguration section */`;
+
+      const configs = parseBuildConfigurations(content);
+
+      expect(configs.size).toBe(1);
+      const debug = configs.get('a1a1a1a1a1a1a1a1a1a1a1a1');
+      expect(debug?.name).toBe('Debug');
+    });
   });
 
   describe('parseConfigurationLists', () => {
@@ -321,6 +423,29 @@ describe('pbxproj-parser', () => {
       expect(list?.buildConfigurationIds).toEqual([
         'A1A1A1A1A1A1A1A1A1A1A1A1',
         'B2B2B2B2B2B2B2B2B2B2B2B2',
+      ]);
+    });
+
+    // P2 FIX: Lowercase hex ID test
+    it('should parse configuration lists with lowercase hex IDs', () => {
+      const content = `
+/* Begin XCConfigurationList section */
+    c1c1c1c1c1c1c1c1c1c1c1c1 /* Build configuration list */ = {
+      isa = XCConfigurationList;
+      buildConfigurations = (
+        a1a1a1a1a1a1a1a1a1a1a1a1 /* Debug */,
+        b2b2b2b2b2b2b2b2b2b2b2b2 /* Release */,
+      );
+    };
+/* End XCConfigurationList section */`;
+
+      const lists = parseConfigurationLists(content);
+
+      expect(lists.size).toBe(1);
+      const list = lists.get('c1c1c1c1c1c1c1c1c1c1c1c1');
+      expect(list?.buildConfigurationIds).toEqual([
+        'a1a1a1a1a1a1a1a1a1a1a1a1',
+        'b2b2b2b2b2b2b2b2b2b2b2b2',
       ]);
     });
   });

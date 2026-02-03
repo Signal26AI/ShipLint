@@ -32,7 +32,6 @@ export enum ProductType {
   DynamicLibrary = 'com.apple.product-type.library.dynamic',
   Bundle = 'com.apple.product-type.bundle',
   XPCService = 'com.apple.product-type.xpc-service',
-  AppClip = 'com.apple.product-type.application.on-demand-install-capable',
 }
 
 /**
@@ -123,7 +122,7 @@ export function parsePbxprojTargets(content: string): PbxprojTarget[] {
   // Match PBXNativeTarget section entries
   // Format: ID /* Name */ = { isa = PBXNativeTarget; ... };
   // This regex captures the full target block
-  const targetRegex = /([A-F0-9]{24})\s*\/\*\s*([^*]+?)\s*\*\/\s*=\s*\{([^}]*isa\s*=\s*PBXNativeTarget[^}]*(?:\{[^}]*\}[^}]*)*)\};/g;
+  const targetRegex = /([A-Fa-f0-9]{24})\s*\/\*\s*([^*]+?)\s*\*\/\s*=\s*\{([^}]*isa\s*=\s*PBXNativeTarget[^}]*(?:\{[^}]*\}[^}]*)*)\};/g;
   
   let match;
   while ((match = targetRegex.exec(content)) !== null) {
@@ -136,7 +135,7 @@ export function parsePbxprojTargets(content: string): PbxprojTarget[] {
     const productType = productTypeMatch ? productTypeMatch[1] : '';
     
     // Extract buildConfigurationList
-    const configListMatch = block.match(/buildConfigurationList\s*=\s*([A-F0-9]{24})/);
+    const configListMatch = block.match(/buildConfigurationList\s*=\s*([A-Fa-f0-9]{24})/);
     const buildConfigurationListId = configListMatch ? configListMatch[1] : '';
     
     // Extract productName if present
@@ -242,7 +241,7 @@ export function parseBuildConfigurations(content: string): Map<string, PbxprojBu
   
   // Match XCBuildConfiguration entries
   // Format: ID /* Name */ = { isa = XCBuildConfiguration; buildSettings = { ... }; name = Name; };
-  const configRegex = /([A-F0-9]{24})\s*\/\*\s*([^*]+?)\s*\*\/\s*=\s*\{[^}]*isa\s*=\s*XCBuildConfiguration[^}]*buildSettings\s*=\s*\{([^}]*)\}[^}]*name\s*=\s*"?([^";]+)"?\s*;[^}]*\};/g;
+  const configRegex = /([A-Fa-f0-9]{24})\s*\/\*\s*([^*]+?)\s*\*\/\s*=\s*\{[^}]*isa\s*=\s*XCBuildConfiguration[^}]*buildSettings\s*=\s*\{([^}]*)\}[^}]*name\s*=\s*"?([^";]+)"?\s*;[^}]*\};/g;
   
   let match;
   while ((match = configRegex.exec(content)) !== null) {
@@ -280,7 +279,7 @@ export function parseConfigurationLists(content: string): Map<string, PbxprojCon
   
   // Match XCConfigurationList entries
   // Format: ID /* ... */ = { isa = XCConfigurationList; buildConfigurations = ( ID1, ID2, ); ... };
-  const listRegex = /([A-F0-9]{24})\s*\/\*[^*]*\*\/\s*=\s*\{[^}]*isa\s*=\s*XCConfigurationList[^}]*buildConfigurations\s*=\s*\(([^)]+)\)/g;
+  const listRegex = /([A-Fa-f0-9]{24})\s*\/\*[^*]*\*\/\s*=\s*\{[^}]*isa\s*=\s*XCConfigurationList[^}]*buildConfigurations\s*=\s*\(([^)]+)\)/g;
   
   let match;
   while ((match = listRegex.exec(content)) !== null) {
@@ -289,7 +288,7 @@ export function parseConfigurationLists(content: string): Map<string, PbxprojCon
     
     // Extract config IDs
     const configIds: string[] = [];
-    const idRegex = /([A-F0-9]{24})/g;
+    const idRegex = /([A-Fa-f0-9]{24})/g;
     let idMatch;
     while ((idMatch = idRegex.exec(configsBlock)) !== null) {
       configIds.push(idMatch[1]);
@@ -397,24 +396,42 @@ export function normalizeXcodePath(
 ): string {
   let result = rawPath;
   
-  // Remove $(SRCROOT)/ or ${SRCROOT}/
-  result = result.replace(/\$[\({]SRCROOT[\)}]\/?/g, '');
-  
-  // Remove $(PROJECT_DIR)/ or ${PROJECT_DIR}/
-  result = result.replace(/\$[\({]PROJECT_DIR[\)}]\/?/g, '');
-  
-  // Replace $(TARGET_NAME) or ${TARGET_NAME}
-  if (context.targetName) {
-    result = result.replace(/\$[\({]TARGET_NAME[\)}]/g, context.targetName);
+  // Strip surrounding quotes (e.g., "My App/Info.plist" -> My App/Info.plist)
+  if ((result.startsWith('"') && result.endsWith('"')) ||
+      (result.startsWith("'") && result.endsWith("'"))) {
+    result = result.slice(1, -1);
   }
   
-  // Replace $(PRODUCT_NAME) or ${PRODUCT_NAME}
-  if (context.productName) {
-    result = result.replace(/\$[\({]PRODUCT_NAME[\)}]/g, context.productName);
+  // Iteratively expand variables until no more $() or ${} patterns remain
+  // This handles nested variables like $(PRODUCT_NAME) -> $(TARGET_NAME) -> actual value
+  const maxIterations = 10; // Prevent infinite loops
+  for (let i = 0; i < maxIterations; i++) {
+    const before = result;
+    
+    // Remove $(SRCROOT)/ or ${SRCROOT}/
+    result = result.replace(/\$[\({]SRCROOT[\)}]\/?/g, '');
+    
+    // Remove $(PROJECT_DIR)/ or ${PROJECT_DIR}/
+    result = result.replace(/\$[\({]PROJECT_DIR[\)}]\/?/g, '');
+    
+    // Replace $(TARGET_NAME) or ${TARGET_NAME}
+    if (context.targetName) {
+      result = result.replace(/\$[\({]TARGET_NAME[\)}]/g, context.targetName);
+    }
+    
+    // Replace $(PRODUCT_NAME) or ${PRODUCT_NAME}
+    if (context.productName) {
+      result = result.replace(/\$[\({]PRODUCT_NAME[\)}]/g, context.productName);
+    }
+    
+    // Replace $(inherited) - usually in arrays, remove it
+    result = result.replace(/\$[\({]inherited[\)}]/g, '');
+    
+    // If no changes were made, we're done
+    if (result === before) {
+      break;
+    }
   }
-  
-  // Replace $(inherited) - usually in arrays, remove it
-  result = result.replace(/\$[\({]inherited[\)}]/g, '');
   
   // Clean up any double slashes
   result = result.replace(/\/\//g, '/');
