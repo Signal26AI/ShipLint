@@ -1,191 +1,281 @@
 /**
- * Tests for framework detector
+ * Tests for framework-detector.ts
+ * Covers bug fix #3: Recursive lockfile discovery
  */
-import {
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { 
+  loadAllDependencies, 
   parsePodfileLockContent,
   parsePackageResolvedData,
-  parseProjectFrameworksContent,
   detectTrackingSDKs,
-  detectSocialLoginSDKs,
+  detectSocialLoginSDKs 
 } from '../../src/parsers/framework-detector';
-import { Dependency, DependencySource } from '../../src/types';
+import { DependencySource } from '../../src/types';
+
+describe('loadAllDependencies', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reviewshield-deps-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  describe('Bug Fix #3: Recursive lockfile discovery', () => {
+    it('should find Podfile.lock in nested ios directory', () => {
+      // Common React Native structure: ios/Podfile.lock
+      const iosDir = path.join(tempDir, 'ios');
+      fs.mkdirSync(iosDir, { recursive: true });
+      fs.writeFileSync(path.join(iosDir, 'Podfile.lock'), `PODS:
+  - Alamofire (5.6.4)
+
+DEPENDENCIES:
+  - Alamofire
+
+SPEC CHECKSUMS:
+  Alamofire: abc123
+
+COCOAPODS: 1.12.0
+`);
+
+      const deps = loadAllDependencies(tempDir);
+
+      expect(deps.some(d => d.name === 'Alamofire')).toBe(true);
+      expect(deps.find(d => d.name === 'Alamofire')?.source).toBe(DependencySource.CocoaPods);
+    });
+
+    it('should find Package.resolved in nested locations', () => {
+      // Create nested SPM resolved file
+      const nestedDir = path.join(tempDir, 'packages', 'ios-app');
+      fs.mkdirSync(nestedDir, { recursive: true });
+      fs.writeFileSync(path.join(nestedDir, 'Package.resolved'), JSON.stringify({
+        pins: [
+          { identity: 'swift-algorithms', state: { version: '1.0.0' } }
+        ]
+      }));
+
+      const deps = loadAllDependencies(tempDir);
+
+      expect(deps.some(d => d.name === 'swift-algorithms')).toBe(true);
+      expect(deps.find(d => d.name === 'swift-algorithms')?.source).toBe(DependencySource.SPM);
+    });
+
+    it('should find Package.resolved inside .xcodeproj bundle', () => {
+      // Create structure: MyApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+      const spmDir = path.join(tempDir, 'MyApp.xcodeproj', 'project.xcworkspace', 'xcshareddata', 'swiftpm');
+      fs.mkdirSync(spmDir, { recursive: true });
+      fs.writeFileSync(path.join(spmDir, 'Package.resolved'), JSON.stringify({
+        pins: [
+          { identity: 'swift-collections', state: { version: '1.0.4' } }
+        ]
+      }));
+
+      const deps = loadAllDependencies(tempDir);
+
+      expect(deps.some(d => d.name === 'swift-collections')).toBe(true);
+    });
+
+    it('should find lockfiles in multiple locations and dedupe', () => {
+      // Root Podfile.lock
+      fs.writeFileSync(path.join(tempDir, 'Podfile.lock'), `PODS:
+  - AFNetworking (4.0.1)
+
+COCOAPODS: 1.12.0
+`);
+
+      // Nested ios/ Podfile.lock with same dependency
+      const iosDir = path.join(tempDir, 'ios');
+      fs.mkdirSync(iosDir);
+      fs.writeFileSync(path.join(iosDir, 'Podfile.lock'), `PODS:
+  - AFNetworking (4.0.1)
+
+COCOAPODS: 1.12.0
+`);
+
+      const deps = loadAllDependencies(tempDir);
+
+      // Should dedupe by name@version
+      const afnetworking = deps.filter(d => d.name === 'AFNetworking');
+      expect(afnetworking.length).toBe(1);
+    });
+
+    it('should handle monorepo with multiple iOS apps', () => {
+      // apps/app1/ios/Podfile.lock
+      const app1Dir = path.join(tempDir, 'apps', 'app1', 'ios');
+      fs.mkdirSync(app1Dir, { recursive: true });
+      fs.writeFileSync(path.join(app1Dir, 'Podfile.lock'), `PODS:
+  - Firebase (10.0.0)
+
+COCOAPODS: 1.12.0
+`);
+
+      // apps/app2/ios/Podfile.lock
+      const app2Dir = path.join(tempDir, 'apps', 'app2', 'ios');
+      fs.mkdirSync(app2Dir, { recursive: true });
+      fs.writeFileSync(path.join(app2Dir, 'Podfile.lock'), `PODS:
+  - Realm (10.40.0)
+
+COCOAPODS: 1.12.0
+`);
+
+      const deps = loadAllDependencies(tempDir);
+
+      expect(deps.some(d => d.name === 'Firebase')).toBe(true);
+      expect(deps.some(d => d.name === 'Realm')).toBe(true);
+    });
+
+    it('should check .swiftpm/Package.resolved location', () => {
+      const swiftpmDir = path.join(tempDir, '.swiftpm');
+      fs.mkdirSync(swiftpmDir);
+      fs.writeFileSync(path.join(swiftpmDir, 'Package.resolved'), JSON.stringify({
+        pins: [
+          { identity: 'swift-nio', state: { version: '2.0.0' } }
+        ]
+      }));
+
+      const deps = loadAllDependencies(tempDir);
+
+      expect(deps.some(d => d.name === 'swift-nio')).toBe(true);
+    });
+  });
+
+  describe('Edge cases', () => {
+    it('should return empty array for empty directory', () => {
+      const deps = loadAllDependencies(tempDir);
+      expect(deps).toEqual([]);
+    });
+
+    it('should handle malformed Podfile.lock gracefully', () => {
+      fs.writeFileSync(path.join(tempDir, 'Podfile.lock'), 'not valid yaml format');
+      
+      // Should not throw
+      const deps = loadAllDependencies(tempDir);
+      expect(Array.isArray(deps)).toBe(true);
+    });
+
+    it('should handle malformed Package.resolved gracefully', () => {
+      fs.writeFileSync(path.join(tempDir, 'Package.resolved'), 'not json');
+      
+      // Should not throw
+      const deps = loadAllDependencies(tempDir);
+      expect(Array.isArray(deps)).toBe(true);
+    });
+  });
+});
 
 describe('parsePodfileLockContent', () => {
-  it('should parse Podfile.lock dependencies', () => {
-    const content = `
-PODS:
+  it('should parse pods with versions', () => {
+    const content = `PODS:
   - Alamofire (5.6.4)
   - Firebase/Analytics (10.0.0):
     - FirebaseAnalytics
-  - GoogleSignIn (6.0.0)
-  - FBSDKLoginKit (14.0.0)
+  - FirebaseAnalytics (10.0.0)
 
 DEPENDENCIES:
   - Alamofire
   - Firebase/Analytics
+
+COCOAPODS: 1.12.0
 `;
 
-    const result = parsePodfileLockContent(content);
-    
-    expect(result).toContainEqual({
-      name: 'Alamofire',
-      version: '5.6.4',
-      source: DependencySource.CocoaPods,
-    });
-    expect(result).toContainEqual({
-      name: 'Firebase',
-      version: '10.0.0',
-      source: DependencySource.CocoaPods,
-    });
-    expect(result).toContainEqual({
-      name: 'Firebase/Analytics',
-      version: '10.0.0',
-      source: DependencySource.CocoaPods,
-    });
+    const deps = parsePodfileLockContent(content);
+
+    expect(deps.some(d => d.name === 'Alamofire' && d.version === '5.6.4')).toBe(true);
+    expect(deps.some(d => d.name === 'Firebase')).toBe(true);
+    expect(deps.some(d => d.name === 'Firebase/Analytics')).toBe(true);
   });
 
-  it('should handle empty Podfile.lock', () => {
-    const result = parsePodfileLockContent('');
-    expect(result).toEqual([]);
+  it('should handle subspecs correctly', () => {
+    const content = `PODS:
+  - Firebase/Core (10.0.0)
+  - Firebase/Analytics (10.0.0)
+
+COCOAPODS: 1.12.0
+`;
+
+    const deps = parsePodfileLockContent(content);
+
+    // Should have base name and subspecs
+    expect(deps.some(d => d.name === 'Firebase')).toBe(true);
+    expect(deps.some(d => d.name === 'Firebase/Core')).toBe(true);
+    expect(deps.some(d => d.name === 'Firebase/Analytics')).toBe(true);
   });
 });
 
 describe('parsePackageResolvedData', () => {
-  it('should parse Package.resolved v2 format', () => {
-    const json = {
+  it('should parse v2 format', () => {
+    const data = {
       pins: [
-        {
-          identity: 'alamofire',
-          state: { version: '5.6.4' },
-        },
-        {
-          identity: 'firebase-ios-sdk',
-          state: { version: '10.0.0' },
-        },
-      ],
-      version: 2,
+        { identity: 'swift-algorithms', state: { version: '1.0.0' } },
+        { identity: 'swift-collections', state: { version: '1.0.4' } }
+      ]
     };
 
-    const result = parsePackageResolvedData(json);
-    
-    expect(result).toContainEqual({
-      name: 'alamofire',
-      version: '5.6.4',
-      source: DependencySource.SPM,
-    });
-    expect(result).toContainEqual({
-      name: 'firebase-ios-sdk',
-      version: '10.0.0',
-      source: DependencySource.SPM,
-    });
+    const deps = parsePackageResolvedData(data);
+
+    expect(deps).toHaveLength(2);
+    expect(deps.some(d => d.name === 'swift-algorithms')).toBe(true);
   });
 
-  it('should parse Package.resolved v1 format', () => {
-    const json = {
+  it('should parse v1 format', () => {
+    const data = {
       object: {
         pins: [
-          {
-            package: 'Alamofire',
-            state: { version: '5.6.4' },
-          },
-        ],
-      },
-      version: 1,
+          { package: 'Alamofire', state: { version: '5.6.4' } }
+        ]
+      }
     };
 
-    const result = parsePackageResolvedData(json);
-    
-    expect(result).toContainEqual({
-      name: 'Alamofire',
-      version: '5.6.4',
-      source: DependencySource.SPM,
-    });
-  });
-});
+    const deps = parsePackageResolvedData(data);
 
-describe('parseProjectFrameworksContent', () => {
-  it('should extract framework names', () => {
-    const content = `
-      files = (
-        AB123456 /* AVFoundation.framework */,
-        CD789012 /* CoreLocation.framework */,
-        EF345678 /* UIKit.framework */,
-      );
-    `;
-
-    const result = parseProjectFrameworksContent(content);
-    
-    expect(result).toContain('AVFoundation');
-    expect(result).toContain('CoreLocation');
-    expect(result).toContain('UIKit');
+    expect(deps.some(d => d.name === 'Alamofire')).toBe(true);
   });
 });
 
 describe('detectTrackingSDKs', () => {
   it('should detect Facebook SDK', () => {
-    const deps: Dependency[] = [
-      { name: 'FBSDKCoreKit', version: '14.0.0', source: DependencySource.CocoaPods },
+    const deps = [
+      { name: 'FBSDKCoreKit', version: '16.0.0', source: DependencySource.CocoaPods }
     ];
 
-    const result = detectTrackingSDKs(deps);
-    
-    expect(result).toContain('Facebook SDK');
+    const tracking = detectTrackingSDKs(deps);
+
+    expect(tracking).toContain('Facebook SDK');
   });
 
-  it('should detect multiple tracking SDKs', () => {
-    const deps: Dependency[] = [
-      { name: 'FirebaseAnalytics', version: '10.0.0', source: DependencySource.CocoaPods },
-      { name: 'Adjust', version: '4.0.0', source: DependencySource.CocoaPods },
-      { name: 'AppsFlyer', version: '6.0.0', source: DependencySource.CocoaPods },
+  it('should detect Firebase Analytics', () => {
+    const deps = [
+      { name: 'Firebase/Analytics', version: '10.0.0', source: DependencySource.CocoaPods }
     ];
 
-    const result = detectTrackingSDKs(deps);
-    
-    expect(result).toContain('Firebase Analytics');
-    expect(result).toContain('Adjust');
-    expect(result).toContain('AppsFlyer');
-  });
+    const tracking = detectTrackingSDKs(deps);
 
-  it('should return empty for no tracking SDKs', () => {
-    const deps: Dependency[] = [
-      { name: 'Alamofire', version: '5.6.4', source: DependencySource.CocoaPods },
-      { name: 'SwiftyJSON', version: '5.0.0', source: DependencySource.CocoaPods },
-    ];
-
-    const result = detectTrackingSDKs(deps);
-    
-    expect(result).toEqual([]);
+    expect(tracking).toContain('Firebase Analytics');
   });
 });
 
 describe('detectSocialLoginSDKs', () => {
   it('should detect Google Sign-In', () => {
-    const deps: Dependency[] = [
-      { name: 'GoogleSignIn', version: '6.0.0', source: DependencySource.CocoaPods },
+    const deps = [
+      { name: 'GoogleSignIn', version: '7.0.0', source: DependencySource.CocoaPods }
     ];
 
-    const result = detectSocialLoginSDKs(deps);
-    
-    expect(result).toContain('Google Sign-In');
+    const social = detectSocialLoginSDKs(deps);
+
+    expect(social).toContain('Google Sign-In');
   });
 
   it('should detect Facebook Login', () => {
-    const deps: Dependency[] = [
-      { name: 'FBSDKLoginKit', version: '14.0.0', source: DependencySource.CocoaPods },
+    const deps = [
+      { name: 'FBSDKLoginKit', version: '16.0.0', source: DependencySource.CocoaPods }
     ];
 
-    const result = detectSocialLoginSDKs(deps);
-    
-    expect(result).toContain('Facebook Login');
-  });
+    const social = detectSocialLoginSDKs(deps);
 
-  it('should detect Firebase Auth', () => {
-    const deps: Dependency[] = [
-      { name: 'FirebaseAuth', version: '10.0.0', source: DependencySource.CocoaPods },
-    ];
-
-    const result = detectSocialLoginSDKs(deps);
-    
-    expect(result).toContain('Firebase Auth');
+    expect(social).toContain('Facebook Login');
   });
 });

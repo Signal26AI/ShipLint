@@ -20,6 +20,61 @@ export interface ProjectDiscovery {
 }
 
 /**
+ * Maximum depth for recursive directory searches
+ */
+const MAX_SEARCH_DEPTH = 5;
+
+/**
+ * Recursively find files matching a pattern
+ */
+function findFilesRecursive(
+  dir: string,
+  predicate: (name: string, fullPath: string) => boolean,
+  maxDepth: number = MAX_SEARCH_DEPTH,
+  currentDepth: number = 0
+): string[] {
+  if (currentDepth >= maxDepth) return [];
+  
+  const results: string[] = [];
+  
+  try {
+    const entries = fs.readdirSync(dir);
+    
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry);
+      
+      // Skip common non-project directories for performance
+      if (entry === 'node_modules' || entry === '.git' || entry === 'Pods' || 
+          entry === 'build' || entry === 'DerivedData' || entry === '.build') {
+        continue;
+      }
+      
+      if (predicate(entry, fullPath)) {
+        results.push(fullPath);
+      }
+      
+      // Recurse into directories (but not into .xcodeproj/.xcworkspace bundles)
+      try {
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory() && 
+            !entry.endsWith('.xcodeproj') && 
+            !entry.endsWith('.xcworkspace') &&
+            !entry.endsWith('.app') &&
+            !entry.endsWith('.framework')) {
+          results.push(...findFilesRecursive(fullPath, predicate, maxDepth, currentDepth + 1));
+        }
+      } catch {
+        // Ignore stat errors (permissions, etc.)
+      }
+    }
+  } catch {
+    // Ignore readdir errors
+  }
+  
+  return results;
+}
+
+/**
  * Discovers project files in a directory
  */
 export function discoverProject(inputPath: string): ProjectDiscovery {
@@ -29,6 +84,53 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
     throw new Error('IPA scanning is not yet supported. Please extract the IPA and point to the extracted app.');
   }
   
+  // BUG FIX #1: Handle direct .xcodeproj path
+  // If the input IS a .xcodeproj directory, use it directly
+  if (stat.isDirectory() && inputPath.endsWith('.xcodeproj')) {
+    const pbxprojPath = path.join(inputPath, 'project.pbxproj');
+    const basePath = path.dirname(inputPath);
+    
+    const discovery: ProjectDiscovery = {
+      projectPath: basePath,
+      isWorkspace: false,
+    };
+    
+    if (fs.existsSync(pbxprojPath)) {
+      discovery.pbxprojPath = pbxprojPath;
+    }
+    
+    // Still look for Info.plist and entitlements in parent directory
+    discoverInfoPlist(basePath, discovery);
+    discoverEntitlements(basePath, discovery);
+    
+    return discovery;
+  }
+  
+  // Handle .xcworkspace path similarly
+  if (stat.isDirectory() && inputPath.endsWith('.xcworkspace')) {
+    const basePath = path.dirname(inputPath);
+    
+    const discovery: ProjectDiscovery = {
+      projectPath: basePath,
+      isWorkspace: true,
+    };
+    
+    // Look for .xcodeproj siblings
+    const xcodeprojs = findFilesRecursive(basePath, (name) => name.endsWith('.xcodeproj'), 2);
+    for (const xcodeprojPath of xcodeprojs) {
+      const pbxprojPath = path.join(xcodeprojPath, 'project.pbxproj');
+      if (fs.existsSync(pbxprojPath)) {
+        discovery.pbxprojPath = pbxprojPath;
+        break;
+      }
+    }
+    
+    discoverInfoPlist(basePath, discovery);
+    discoverEntitlements(basePath, discovery);
+    
+    return discovery;
+  }
+  
   const basePath = stat.isDirectory() ? inputPath : path.dirname(inputPath);
   
   const discovery: ProjectDiscovery = {
@@ -36,60 +138,57 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
     isWorkspace: false,
   };
   
-  // Look for xcworkspace or xcodeproj
-  const entries = fs.readdirSync(basePath);
-  
-  for (const entry of entries) {
-    const fullPath = path.join(basePath, entry);
-    
-    if (entry.endsWith('.xcworkspace')) {
-      discovery.isWorkspace = true;
-    } else if (entry.endsWith('.xcodeproj')) {
-      const pbxprojPath = path.join(fullPath, 'project.pbxproj');
-      if (fs.existsSync(pbxprojPath)) {
-        discovery.pbxprojPath = pbxprojPath;
-      }
-    }
+  // BUG FIX #3: Recursive search for xcworkspace and xcodeproj
+  const xcworkspaces = findFilesRecursive(basePath, (name) => name.endsWith('.xcworkspace'));
+  if (xcworkspaces.length > 0) {
+    discovery.isWorkspace = true;
   }
   
-  // Look for Info.plist in common locations
-  const infoPlistLocations = [
-    path.join(basePath, 'Info.plist'),
-    ...entries
-      .filter(e => fs.statSync(path.join(basePath, e)).isDirectory())
-      .map(e => path.join(basePath, e, 'Info.plist')),
-  ];
-  
-  for (const loc of infoPlistLocations) {
-    if (fs.existsSync(loc)) {
-      discovery.infoPlistPath = loc;
+  const xcodeprojs = findFilesRecursive(basePath, (name) => name.endsWith('.xcodeproj'));
+  for (const xcodeprojPath of xcodeprojs) {
+    const pbxprojPath = path.join(xcodeprojPath, 'project.pbxproj');
+    if (fs.existsSync(pbxprojPath)) {
+      discovery.pbxprojPath = pbxprojPath;
       break;
     }
   }
   
-  // Look for entitlements files
-  const entitlementsPatterns = ['*.entitlements', '**/*.entitlements'];
-  for (const entry of entries) {
-    if (entry.endsWith('.entitlements')) {
-      discovery.entitlementsPath = path.join(basePath, entry);
-      break;
-    }
-    
-    const fullPath = path.join(basePath, entry);
-    if (fs.statSync(fullPath).isDirectory()) {
-      const subEntries = fs.readdirSync(fullPath);
-      for (const subEntry of subEntries) {
-        if (subEntry.endsWith('.entitlements')) {
-          discovery.entitlementsPath = path.join(fullPath, subEntry);
-          break;
-        }
-      }
-    }
-    
-    if (discovery.entitlementsPath) break;
-  }
+  discoverInfoPlist(basePath, discovery);
+  discoverEntitlements(basePath, discovery);
   
   return discovery;
+}
+
+/**
+ * Discovers Info.plist in project directory (recursive)
+ */
+function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery): void {
+  // First check root
+  const rootPlist = path.join(basePath, 'Info.plist');
+  if (fs.existsSync(rootPlist)) {
+    discovery.infoPlistPath = rootPlist;
+    return;
+  }
+  
+  // Recursive search
+  const plists = findFilesRecursive(basePath, (name) => name === 'Info.plist');
+  if (plists.length > 0) {
+    // Prefer shorter paths (closer to root)
+    plists.sort((a, b) => a.split(path.sep).length - b.split(path.sep).length);
+    discovery.infoPlistPath = plists[0];
+  }
+}
+
+/**
+ * Discovers entitlements file in project directory (recursive)
+ */
+function discoverEntitlements(basePath: string, discovery: ProjectDiscovery): void {
+  const entitlements = findFilesRecursive(basePath, (name) => name.endsWith('.entitlements'));
+  if (entitlements.length > 0) {
+    // Prefer shorter paths (closer to root)
+    entitlements.sort((a, b) => a.split(path.sep).length - b.split(path.sep).length);
+    discovery.entitlementsPath = entitlements[0];
+  }
 }
 
 /**

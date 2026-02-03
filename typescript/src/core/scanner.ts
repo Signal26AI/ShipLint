@@ -3,7 +3,30 @@
  */
 import type { Rule, Finding, ScanResult, ScanContext, ScanOptions } from '../types/index.js';
 import { discoverProject, createScanContext } from '../parsers/project-parser.js';
-import { allRules, getRules, getRulesExcluding } from '../rules/index.js';
+import { allRules, getRulesWithValidation, getRulesExcluding } from '../rules/index.js';
+
+/**
+ * Error thrown when invalid rule IDs are specified
+ */
+export class InvalidRulesError extends Error {
+  constructor(public unknownIds: string[], public availableIds: string[]) {
+    super(
+      `Unknown rule ID(s): ${unknownIds.join(', ')}. ` +
+      `Available rules: ${availableIds.join(', ')}`
+    );
+    this.name = 'InvalidRulesError';
+  }
+}
+
+/**
+ * Error thrown when no rules would be run
+ */
+export class NoRulesError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NoRulesError';
+  }
+}
 
 /**
  * Run a scan on the given path
@@ -19,13 +42,43 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
   
   // Determine which rules to run
   let rules: Rule[];
+  const warnings: string[] = [];
   
   if (options.rules && options.rules.length > 0) {
-    rules = getRules(options.rules);
+    // BUG FIX #2: Validate rule IDs and error on unknown
+    const { rules: foundRules, unknownIds } = getRulesWithValidation(options.rules);
+    
+    if (unknownIds.length > 0) {
+      throw new InvalidRulesError(
+        unknownIds,
+        allRules.map(r => r.id)
+      );
+    }
+    
+    if (foundRules.length === 0) {
+      throw new NoRulesError(
+        'No valid rules to run. Check your --rules argument.'
+      );
+    }
+    
+    rules = foundRules;
   } else if (options.exclude && options.exclude.length > 0) {
     rules = getRulesExcluding(options.exclude);
+    
+    if (rules.length === 0) {
+      throw new NoRulesError(
+        'All rules were excluded. At least one rule must run.'
+      );
+    }
   } else {
     rules = allRules;
+  }
+  
+  // Final safety check: never run with zero rules
+  if (rules.length === 0) {
+    throw new NoRulesError(
+      'No rules available to run. This should not happen - please report this bug.'
+    );
   }
   
   // Run all rules

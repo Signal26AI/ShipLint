@@ -275,26 +275,128 @@ export function detectSocialLoginSDKs(dependencies: Dependency[]): string[] {
 }
 
 /**
+ * Maximum depth for recursive directory searches
+ */
+const MAX_SEARCH_DEPTH = 5;
+
+/**
+ * Recursively find files matching a predicate
+ */
+function findFilesRecursive(
+  dir: string,
+  predicate: (name: string) => boolean,
+  maxDepth: number = MAX_SEARCH_DEPTH,
+  currentDepth: number = 0
+): string[] {
+  if (currentDepth >= maxDepth) return [];
+  
+  const results: string[] = [];
+  
+  try {
+    const entries = fs.readdirSync(dir);
+    
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry);
+      
+      // Skip common non-project directories for performance
+      if (entry === 'node_modules' || entry === '.git' || 
+          entry === 'build' || entry === 'DerivedData' || entry === '.build') {
+        continue;
+      }
+      
+      if (predicate(entry)) {
+        results.push(fullPath);
+      }
+      
+      // Recurse into directories
+      try {
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory() && 
+            !entry.endsWith('.xcodeproj') && 
+            !entry.endsWith('.xcworkspace') &&
+            !entry.endsWith('.app') &&
+            !entry.endsWith('.framework')) {
+          results.push(...findFilesRecursive(fullPath, predicate, maxDepth, currentDepth + 1));
+        }
+      } catch {
+        // Ignore stat errors
+      }
+    }
+  } catch {
+    // Ignore readdir errors
+  }
+  
+  return results;
+}
+
+/**
  * Loads all dependencies from a project directory
+ * BUG FIX #3: Now searches recursively for lockfiles
  */
 export function loadAllDependencies(projectDir: string): Dependency[] {
   const all: Dependency[] = [];
+  const seenPodfiles = new Set<string>();
+  const seenPackageResolved = new Set<string>();
   
-  // Try Podfile.lock
-  const podfileLock = path.join(projectDir, 'Podfile.lock');
-  all.push(...parsePodfileLock(podfileLock));
+  // Find all Podfile.lock files recursively
+  const podfileLocks = findFilesRecursive(projectDir, (name) => name === 'Podfile.lock');
   
-  // Try Package.resolved in various locations
-  const packageResolvedLocations = [
+  // Also check root explicitly (in case of permission issues during recursion)
+  const rootPodfileLock = path.join(projectDir, 'Podfile.lock');
+  if (fs.existsSync(rootPodfileLock) && !podfileLocks.includes(rootPodfileLock)) {
+    podfileLocks.unshift(rootPodfileLock);
+  }
+  
+  for (const podfileLock of podfileLocks) {
+    const deps = parsePodfileLock(podfileLock);
+    for (const dep of deps) {
+      const key = `${dep.name}@${dep.version}`;
+      if (!seenPodfiles.has(key)) {
+        seenPodfiles.add(key);
+        all.push(dep);
+      }
+    }
+  }
+  
+  // Find all Package.resolved files recursively
+  const packageResolvedFiles = findFilesRecursive(
+    projectDir, 
+    (name) => name === 'Package.resolved'
+  );
+  
+  // Also check common explicit locations
+  const explicitLocations = [
     path.join(projectDir, 'Package.resolved'),
     path.join(projectDir, '.swiftpm', 'Package.resolved'),
   ];
   
-  for (const location of packageResolvedLocations) {
-    const spmDeps = parsePackageResolved(location);
-    if (spmDeps.length > 0) {
-      all.push(...spmDeps);
-      break;
+  for (const loc of explicitLocations) {
+    if (fs.existsSync(loc) && !packageResolvedFiles.includes(loc)) {
+      packageResolvedFiles.push(loc);
+    }
+  }
+  
+  // Also search inside .xcodeproj and .xcworkspace for Package.resolved
+  const xcodeBundles = findFilesRecursive(
+    projectDir,
+    (name) => name.endsWith('.xcodeproj') || name.endsWith('.xcworkspace')
+  );
+  
+  for (const bundle of xcodeBundles) {
+    const nestedResolved = path.join(bundle, 'project.xcworkspace', 'xcshareddata', 'swiftpm', 'Package.resolved');
+    if (fs.existsSync(nestedResolved) && !packageResolvedFiles.includes(nestedResolved)) {
+      packageResolvedFiles.push(nestedResolved);
+    }
+  }
+  
+  for (const packageResolved of packageResolvedFiles) {
+    const deps = parsePackageResolved(packageResolved);
+    for (const dep of deps) {
+      const key = `${dep.name}@${dep.version}`;
+      if (!seenPackageResolved.has(key)) {
+        seenPackageResolved.add(key);
+        all.push(dep);
+      }
     }
   }
   

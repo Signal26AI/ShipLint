@@ -147,8 +147,8 @@ export enum OutputFormat {
  */
 export interface ScanOptions {
   path: string;
-  format: OutputFormat;
-  verbose: boolean;
+  format?: OutputFormat;
+  verbose?: boolean;
   rules?: string[];
   exclude?: string[];
 }
