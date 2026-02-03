@@ -280,14 +280,47 @@ export function detectSocialLoginSDKs(dependencies: Dependency[]): string[] {
 const MAX_SEARCH_DEPTH = 5;
 
 /**
+ * Options for findFilesRecursive
+ */
+interface FindFilesOptions {
+  maxDepth?: number;
+  /** Skip directories containing .xcodeproj files not matching this path */
+  currentXcodeprojPath?: string;
+}
+
+/**
+ * Check if directory contains a .xcodeproj different from the specified one
+ */
+function containsSiblingXcodeproj(dir: string, currentXcodeprojPath?: string): boolean {
+  if (!currentXcodeprojPath) return false;
+  
+  try {
+    const entries = fs.readdirSync(dir);
+    for (const entry of entries) {
+      if (entry.endsWith('.xcodeproj')) {
+        const xcprojPath = path.join(dir, entry);
+        if (path.resolve(xcprojPath) !== path.resolve(currentXcodeprojPath)) {
+          return true;
+        }
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return false;
+}
+
+/**
  * Recursively find files matching a predicate
+ * P2-C FIX: Can exclude directories containing sibling .xcodeproj files
  */
 function findFilesRecursive(
   dir: string,
   predicate: (name: string) => boolean,
-  maxDepth: number = MAX_SEARCH_DEPTH,
+  options: FindFilesOptions = {},
   currentDepth: number = 0
 ): string[] {
+  const maxDepth = options.maxDepth ?? MAX_SEARCH_DEPTH;
   if (currentDepth >= maxDepth) return [];
   
   const results: string[] = [];
@@ -316,7 +349,11 @@ function findFilesRecursive(
             !entry.endsWith('.xcworkspace') &&
             !entry.endsWith('.app') &&
             !entry.endsWith('.framework')) {
-          results.push(...findFilesRecursive(fullPath, predicate, maxDepth, currentDepth + 1));
+          // P2-C FIX: Skip directories containing sibling projects
+          if (options.currentXcodeprojPath && containsSiblingXcodeproj(fullPath, options.currentXcodeprojPath)) {
+            continue;
+          }
+          results.push(...findFilesRecursive(fullPath, predicate, options, currentDepth + 1));
         }
       } catch {
         // Ignore stat errors
@@ -330,10 +367,111 @@ function findFilesRecursive(
 }
 
 /**
+ * P2-C FIX: Loads dependencies for a specific .xcodeproj, avoiding recursive scan of whole parent
+ * 
+ * Searches lockfiles only in:
+ * 1. The .xcodeproj directory itself (project.xcworkspace/xcshareddata/swiftpm/Package.resolved)
+ * 2. The parent directory of the .xcodeproj
+ * 3. The parent's .swiftpm directory
+ * 
+ * This prevents picking up lockfiles from sibling projects in monorepos.
+ * 
+ * @param xcodeprojPath Path to the .xcodeproj directory
+ * @returns Array of dependencies found
+ */
+export function loadDependenciesForProject(xcodeprojPath: string): Dependency[] {
+  const all: Dependency[] = [];
+  const seenPodfiles = new Set<string>();
+  const seenPackageResolved = new Set<string>();
+  
+  // Ensure we have the .xcodeproj path
+  const xcprojDir = xcodeprojPath.endsWith('.xcodeproj') 
+    ? xcodeprojPath 
+    : xcodeprojPath.includes('project.pbxproj') 
+      ? path.dirname(xcodeprojPath) 
+      : xcodeprojPath;
+  
+  const projectDir = path.dirname(xcprojDir);
+  
+  // Specific locations to check for Podfile.lock (no recursive scan)
+  const podfileLockLocations = [
+    path.join(projectDir, 'Podfile.lock'),
+    path.join(path.dirname(projectDir), 'Podfile.lock'), // parent dir (workspace root)
+  ];
+  
+  for (const loc of podfileLockLocations) {
+    if (fs.existsSync(loc)) {
+      const deps = parsePodfileLock(loc);
+      for (const dep of deps) {
+        const key = `${dep.name}@${dep.version}`;
+        if (!seenPodfiles.has(key)) {
+          seenPodfiles.add(key);
+          all.push(dep);
+        }
+      }
+    }
+  }
+  
+  // Specific locations for Package.resolved (no recursive scan)
+  const packageResolvedLocations = [
+    // Inside the .xcodeproj bundle
+    path.join(xcprojDir, 'project.xcworkspace', 'xcshareddata', 'swiftpm', 'Package.resolved'),
+    // Project directory
+    path.join(projectDir, 'Package.resolved'),
+    path.join(projectDir, '.swiftpm', 'Package.resolved'),
+    // Parent directory (workspace root)
+    path.join(path.dirname(projectDir), 'Package.resolved'),
+    path.join(path.dirname(projectDir), '.swiftpm', 'Package.resolved'),
+  ];
+  
+  // Also check for workspace-level SPM
+  const workspacePath = path.join(projectDir, path.basename(xcprojDir).replace('.xcodeproj', '.xcworkspace'));
+  if (fs.existsSync(workspacePath)) {
+    packageResolvedLocations.push(
+      path.join(workspacePath, 'xcshareddata', 'swiftpm', 'Package.resolved')
+    );
+  }
+  
+  for (const loc of packageResolvedLocations) {
+    if (fs.existsSync(loc) && !seenPackageResolved.has(loc)) {
+      seenPackageResolved.add(loc);
+      const deps = parsePackageResolved(loc);
+      for (const dep of deps) {
+        const key = `${dep.name}@${dep.version}`;
+        if (!seenPackageResolved.has(key)) {
+          seenPackageResolved.add(key);
+          all.push(dep);
+        }
+      }
+    }
+  }
+  
+  return all;
+}
+
+/**
  * Loads all dependencies from a project directory
  * BUG FIX #3: Now searches recursively for lockfiles
+ * P2-C FIX: When given a .xcodeproj path, uses scoped search to prevent monorepo bleeding
  */
 export function loadAllDependencies(projectDir: string): Dependency[] {
+  // P2-C FIX: If given a .xcodeproj path directly, use the scoped function
+  if (projectDir.endsWith('.xcodeproj')) {
+    return loadDependenciesForProject(projectDir);
+  }
+  
+  // Check if this directory contains a single .xcodeproj - if so, scope to it
+  try {
+    const entries = fs.readdirSync(projectDir);
+    const xcodeprojs = entries.filter(e => e.endsWith('.xcodeproj'));
+    if (xcodeprojs.length === 1) {
+      // Single xcodeproj in directory - use scoped loading
+      return loadDependenciesForProject(path.join(projectDir, xcodeprojs[0]));
+    }
+  } catch {
+    // Fall through to recursive search
+  }
+  
   const all: Dependency[] = [];
   const seenPodfiles = new Set<string>();
   const seenPackageResolved = new Set<string>();

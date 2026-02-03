@@ -6,7 +6,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { 
-  loadAllDependencies, 
+  loadAllDependencies,
+  loadDependenciesForProject,
   parsePodfileLockContent,
   parsePackageResolvedData,
   detectTrackingSDKs,
@@ -277,5 +278,143 @@ describe('detectSocialLoginSDKs', () => {
     const social = detectSocialLoginSDKs(deps);
 
     expect(social).toContain('Facebook Login');
+  });
+});
+
+describe('P2-C Regression: Scoped dependency loading', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reviewshield-deps-scope-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('P2-C: loadDependenciesForProject should ignore unrelated lockfiles in monorepo', () => {
+    // Regression test: Monorepo root with multiple lockfiles
+    // Direct .xcodeproj scan should ignore unrelated lockfiles from sibling projects
+    
+    // monorepo/
+    //   AppA/
+    //     AppA.xcodeproj/project.pbxproj
+    //     Podfile.lock (Firebase)
+    //   AppB/
+    //     AppB.xcodeproj/project.pbxproj
+    //     Podfile.lock (Alamofire)
+    
+    // Create AppA with Firebase dependency
+    const appADir = path.join(tempDir, 'AppA');
+    const appAXcode = path.join(appADir, 'AppA.xcodeproj');
+    fs.mkdirSync(appAXcode, { recursive: true });
+    fs.writeFileSync(path.join(appAXcode, 'project.pbxproj'), '// AppA');
+    fs.writeFileSync(path.join(appADir, 'Podfile.lock'), `PODS:
+  - Firebase (10.0.0)
+  - FirebaseCore (10.0.0)
+
+DEPENDENCIES:
+  - Firebase
+
+COCOAPODS: 1.12.0
+`);
+    
+    // Create AppB with Alamofire dependency
+    const appBDir = path.join(tempDir, 'AppB');
+    const appBXcode = path.join(appBDir, 'AppB.xcodeproj');
+    fs.mkdirSync(appBXcode, { recursive: true });
+    fs.writeFileSync(path.join(appBXcode, 'project.pbxproj'), '// AppB');
+    fs.writeFileSync(path.join(appBDir, 'Podfile.lock'), `PODS:
+  - Alamofire (5.6.4)
+
+DEPENDENCIES:
+  - Alamofire
+
+COCOAPODS: 1.12.0
+`);
+    
+    // Load dependencies for AppB specifically
+    const depsB = loadDependenciesForProject(appBXcode);
+    
+    // Should have Alamofire (AppB's dependency)
+    expect(depsB.some(d => d.name === 'Alamofire')).toBe(true);
+    
+    // Should NOT have Firebase (AppA's dependency)
+    expect(depsB.some(d => d.name === 'Firebase')).toBe(false);
+    expect(depsB.some(d => d.name === 'FirebaseCore')).toBe(false);
+  });
+
+  it('P2-C: loadAllDependencies with .xcodeproj path should use scoped loading', () => {
+    // When loadAllDependencies is called with a .xcodeproj path directly,
+    // it should use scoped loading to prevent picking up sibling lockfiles
+    
+    // Create sibling apps
+    const appADir = path.join(tempDir, 'AppA');
+    const appAXcode = path.join(appADir, 'AppA.xcodeproj');
+    fs.mkdirSync(appAXcode, { recursive: true });
+    fs.writeFileSync(path.join(appAXcode, 'project.pbxproj'), '// AppA');
+    fs.writeFileSync(path.join(appADir, 'Podfile.lock'), `PODS:
+  - SDWebImage (5.0.0)
+
+COCOAPODS: 1.12.0
+`);
+    
+    const appBDir = path.join(tempDir, 'AppB');
+    const appBXcode = path.join(appBDir, 'AppB.xcodeproj');
+    fs.mkdirSync(appBXcode, { recursive: true });
+    fs.writeFileSync(path.join(appBXcode, 'project.pbxproj'), '// AppB');
+    fs.writeFileSync(path.join(appBDir, 'Podfile.lock'), `PODS:
+  - Kingfisher (7.0.0)
+
+COCOAPODS: 1.12.0
+`);
+    
+    // Call loadAllDependencies with AppB's .xcodeproj path
+    const depsB = loadAllDependencies(appBXcode);
+    
+    // Should have Kingfisher (AppB's dependency)
+    expect(depsB.some(d => d.name === 'Kingfisher')).toBe(true);
+    
+    // Should NOT have SDWebImage (AppA's dependency)
+    expect(depsB.some(d => d.name === 'SDWebImage')).toBe(false);
+  });
+
+  it('P2-C: should find Package.resolved inside .xcodeproj bundle', () => {
+    // Test that we still find Package.resolved in the proper SPM location
+    
+    const appDir = path.join(tempDir, 'MyApp');
+    const appXcode = path.join(appDir, 'MyApp.xcodeproj');
+    const spmDir = path.join(appXcode, 'project.xcworkspace', 'xcshareddata', 'swiftpm');
+    fs.mkdirSync(spmDir, { recursive: true });
+    fs.writeFileSync(path.join(appXcode, 'project.pbxproj'), '// project');
+    fs.writeFileSync(path.join(spmDir, 'Package.resolved'), JSON.stringify({
+      pins: [
+        { identity: 'swift-algorithms', state: { version: '1.0.0' } }
+      ]
+    }));
+    
+    const deps = loadDependenciesForProject(appXcode);
+    
+    expect(deps.some(d => d.name === 'swift-algorithms')).toBe(true);
+  });
+
+  it('P2-C: should find lockfiles in parent directory (workspace root)', () => {
+    // Common pattern: Podfile.lock is in parent directory when using workspaces
+    
+    const appDir = path.join(tempDir, 'MyApp');
+    const appXcode = path.join(appDir, 'MyApp.xcodeproj');
+    fs.mkdirSync(appXcode, { recursive: true });
+    fs.writeFileSync(path.join(appXcode, 'project.pbxproj'), '// project');
+    
+    // Podfile.lock in parent (workspace root)
+    fs.writeFileSync(path.join(tempDir, 'Podfile.lock'), `PODS:
+  - SnapKit (5.6.0)
+
+COCOAPODS: 1.12.0
+`);
+    
+    const deps = loadDependenciesForProject(appXcode);
+    
+    expect(deps.some(d => d.name === 'SnapKit')).toBe(true);
   });
 });
