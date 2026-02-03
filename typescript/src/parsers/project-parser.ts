@@ -23,6 +23,8 @@ export interface ProjectDiscovery {
   projectPath: string;
   /** P2 FIX: Scoped directory for artifacts (parent of .xcodeproj) to prevent monorepo mixing */
   projectScopeDir?: string;
+  /** P2-A FIX: Scoped directory for dependency lockfile discovery (the .xcodeproj path itself) */
+  dependencyScopeDir?: string;
   infoPlistPath?: string;
   entitlementsPath?: string;
   pbxprojPath?: string;
@@ -49,14 +51,48 @@ export interface PbxprojArtifacts {
 const MAX_SEARCH_DEPTH = 5;
 
 /**
+ * Options for findFilesRecursive
+ */
+interface FindFilesOptions {
+  maxDepth?: number;
+  /** Path to the current project's .xcodeproj (to exclude sibling project directories) */
+  currentXcodeprojPath?: string;
+}
+
+/**
+ * Check if a directory contains a .xcodeproj that is different from the current one
+ */
+function containsSiblingXcodeproj(dir: string, currentXcodeprojPath?: string): boolean {
+  if (!currentXcodeprojPath) return false;
+  
+  try {
+    const entries = fs.readdirSync(dir);
+    for (const entry of entries) {
+      if (entry.endsWith('.xcodeproj')) {
+        const xcprojPath = path.join(dir, entry);
+        // Normalize paths for comparison
+        if (path.resolve(xcprojPath) !== path.resolve(currentXcodeprojPath)) {
+          return true;
+        }
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return false;
+}
+
+/**
  * Recursively find files matching a pattern
+ * P2-B FIX: Can exclude directories containing sibling .xcodeproj files
  */
 function findFilesRecursive(
   dir: string,
   predicate: (name: string, fullPath: string) => boolean,
-  maxDepth: number = MAX_SEARCH_DEPTH,
+  options: FindFilesOptions = {},
   currentDepth: number = 0
 ): string[] {
+  const maxDepth = options.maxDepth ?? MAX_SEARCH_DEPTH;
   if (currentDepth >= maxDepth) return [];
   
   const results: string[] = [];
@@ -85,7 +121,11 @@ function findFilesRecursive(
             !entry.endsWith('.xcworkspace') &&
             !entry.endsWith('.app') &&
             !entry.endsWith('.framework')) {
-          results.push(...findFilesRecursive(fullPath, predicate, maxDepth, currentDepth + 1));
+          // P2-B FIX: Skip directories that contain a different .xcodeproj (sibling projects)
+          if (options.currentXcodeprojPath && containsSiblingXcodeproj(fullPath, options.currentXcodeprojPath)) {
+            continue;
+          }
+          results.push(...findFilesRecursive(fullPath, predicate, options, currentDepth + 1));
         }
       } catch {
         // Ignore stat errors (permissions, etc.)
@@ -213,6 +253,8 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
       projectPath: basePath,
       // P2 FIX: Scope is the parent of .xcodeproj
       projectScopeDir: basePath,
+      // P2-A FIX: Dependency scope is the .xcodeproj itself to prevent picking up sibling lockfiles
+      dependencyScopeDir: inputPath,
       isWorkspace: false,
     };
     
@@ -287,7 +329,7 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
     
     // Fall back to directory scan if workspace parsing didn't find projects
     if (!discovery.pbxprojPath) {
-      const xcodeprojs = findFilesRecursive(basePath, (name) => name.endsWith('.xcodeproj'), MAX_SEARCH_DEPTH);
+      const xcodeprojs = findFilesRecursive(basePath, (name) => name.endsWith('.xcodeproj'));
       // Filter out Pods
       const mainXcodeprojs = xcodeprojs.filter(p => !p.includes('/Pods/') && !p.endsWith('Pods.xcodeproj'));
       const projectList = mainXcodeprojs.length > 0 ? mainXcodeprojs : xcodeprojs;
@@ -419,8 +461,14 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
  * 
  * P2 FIX: If targetName is provided, first try searching only in the target's subdirectory
  * to avoid picking up Info.plist from sibling projects in monorepos
+ * 
+ * P2-B FIX: Excludes directories containing a different .xcodeproj (sibling projects)
  */
 function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery, targetName?: string): void {
+  // Get the current xcodeproj path for sibling exclusion
+  const currentXcodeprojPath = discovery.pbxprojPath ? path.dirname(discovery.pbxprojPath) : undefined;
+  const findOptions: FindFilesOptions = { currentXcodeprojPath };
+  
   // P2 FIX: If we have a target name, first try the target-specific subdirectory
   if (targetName) {
     const targetDir = path.join(basePath, targetName);
@@ -432,7 +480,7 @@ function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery, target
         return;
       }
       // Recursive search within target directory only
-      const plists = findFilesRecursive(targetDir, (name) => name === 'Info.plist');
+      const plists = findFilesRecursive(targetDir, (name) => name === 'Info.plist', findOptions);
       if (plists.length > 0) {
         plists.sort((a, b) => a.split(path.sep).length - b.split(path.sep).length);
         discovery.infoPlistPath = plists[0];
@@ -448,8 +496,8 @@ function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery, target
     return;
   }
   
-  // Recursive search (fallback when target-specific search fails)
-  const plists = findFilesRecursive(basePath, (name) => name === 'Info.plist');
+  // P2-B FIX: Recursive search with sibling project exclusion
+  const plists = findFilesRecursive(basePath, (name) => name === 'Info.plist', findOptions);
   if (plists.length > 0) {
     // Prefer shorter paths (closer to root)
     plists.sort((a, b) => a.split(path.sep).length - b.split(path.sep).length);
@@ -463,13 +511,19 @@ function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery, target
  * 
  * P2 FIX: If targetName is provided, first try searching only in the target's subdirectory
  * to avoid picking up entitlements from sibling projects in monorepos
+ * 
+ * P2-B FIX: Excludes directories containing a different .xcodeproj (sibling projects)
  */
 function discoverEntitlements(basePath: string, discovery: ProjectDiscovery, targetName?: string): void {
+  // Get the current xcodeproj path for sibling exclusion
+  const currentXcodeprojPath = discovery.pbxprojPath ? path.dirname(discovery.pbxprojPath) : undefined;
+  const findOptions: FindFilesOptions = { currentXcodeprojPath };
+  
   // P2 FIX: If we have a target name, first try the target-specific subdirectory
   if (targetName) {
     const targetDir = path.join(basePath, targetName);
     if (fs.existsSync(targetDir) && fs.statSync(targetDir).isDirectory()) {
-      const entitlements = findFilesRecursive(targetDir, (name) => name.endsWith('.entitlements'));
+      const entitlements = findFilesRecursive(targetDir, (name) => name.endsWith('.entitlements'), findOptions);
       if (entitlements.length > 0) {
         entitlements.sort((a, b) => a.split(path.sep).length - b.split(path.sep).length);
         discovery.entitlementsPath = entitlements[0];
@@ -478,8 +532,8 @@ function discoverEntitlements(basePath: string, discovery: ProjectDiscovery, tar
     }
   }
   
-  // Recursive search (fallback when target-specific search fails)
-  const entitlements = findFilesRecursive(basePath, (name) => name.endsWith('.entitlements'));
+  // P2-B FIX: Recursive search with sibling project exclusion
+  const entitlements = findFilesRecursive(basePath, (name) => name.endsWith('.entitlements'), findOptions);
   if (entitlements.length > 0) {
     // Prefer shorter paths (closer to root)
     entitlements.sort((a, b) => a.split(path.sep).length - b.split(path.sep).length);
@@ -523,9 +577,9 @@ export function createScanContext(discovery: ProjectDiscovery): ScanContext {
     }
   }
   
-  // Load dependencies (P2 FIX: scope to project directory to prevent monorepo mixing)
+  // Load dependencies (P2-A FIX: scope to dependencyScopeDir to prevent picking up sibling project lockfiles)
   try {
-    dependencies = loadAllDependencies(discovery.projectScopeDir || discovery.projectPath);
+    dependencies = loadAllDependencies(discovery.dependencyScopeDir ?? discovery.projectScopeDir ?? discovery.projectPath);
   } catch (error) {
     console.warn(`Warning: Could not load dependencies: ${error}`);
   }

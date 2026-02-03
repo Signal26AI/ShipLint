@@ -616,4 +616,151 @@ buildSettings = {
       expect(discovery.infoPlistPath).toBe(path.join(appInfoDir, 'Info.plist'));
     });
   });
+
+  describe('P2-A/B/C Regression: Monorepo scope bleeding prevention', () => {
+    it('P2-B: should NOT pick Info.plist from sibling project directories', () => {
+      // Regression test: Sibling apps under same parent
+      // When scanning AppB.xcodeproj, should NOT pick AppA's Info.plist
+      
+      // Create monorepo structure:
+      // monorepo/
+      //   AppA/
+      //     AppA.xcodeproj/project.pbxproj
+      //     Info.plist          <- AppA's plist (should be ignored when scanning AppB)
+      //   AppB/
+      //     AppB.xcodeproj/project.pbxproj
+      //     (no Info.plist - must NOT fall back to AppA's)
+      
+      // Create AppA with Info.plist
+      const appADir = path.join(tempDir, 'AppA');
+      const appAXcode = path.join(appADir, 'AppA.xcodeproj');
+      fs.mkdirSync(appAXcode, { recursive: true });
+      fs.writeFileSync(path.join(appAXcode, 'project.pbxproj'), '// AppA project');
+      fs.writeFileSync(path.join(appADir, 'Info.plist'), '<?xml version="1.0"?><plist><dict><key>CFBundleIdentifier</key><string>com.test.AppA</string></dict></plist>');
+      
+      // Create AppB WITHOUT Info.plist
+      const appBDir = path.join(tempDir, 'AppB');
+      const appBXcode = path.join(appBDir, 'AppB.xcodeproj');
+      fs.mkdirSync(appBXcode, { recursive: true });
+      fs.writeFileSync(path.join(appBXcode, 'project.pbxproj'), '// AppB project');
+      // Intentionally no Info.plist in AppB
+      
+      // Scan from AppB's xcodeproj - should NOT find AppA's Info.plist
+      const discovery = discoverProject(appBXcode);
+      
+      expect(discovery.pbxprojPath).toBe(path.join(appBXcode, 'project.pbxproj'));
+      // P2-B fix: Should NOT have picked up AppA's Info.plist
+      // infoPlistPath should be undefined, NOT AppA's Info.plist
+      if (discovery.infoPlistPath) {
+        expect(discovery.infoPlistPath).not.toContain('AppA');
+      }
+    });
+
+    it('P2-B: should pick correct plist when target name differs from folder name', () => {
+      // Regression test: Target name differs from folder name
+      // Fallback should still find the plist in current project, not sibling
+      
+      // monorepo/
+      //   AppA/
+      //     AppA.xcodeproj/project.pbxproj (target name: "MyAppA")
+      //     MyAppA/Info.plist              <- should be found via targetName
+      //   AppB/
+      //     AppB.xcodeproj/project.pbxproj (target name: "MyAppB")
+      //     MyAppB/Info.plist              <- should be found when scanning AppB
+      
+      // Create AppA
+      const appADir = path.join(tempDir, 'AppA');
+      const appAXcode = path.join(appADir, 'AppA.xcodeproj');
+      fs.mkdirSync(appAXcode, { recursive: true });
+      const appATargetDir = path.join(appADir, 'MyAppA');
+      fs.mkdirSync(appATargetDir);
+      fs.writeFileSync(path.join(appATargetDir, 'Info.plist'), '<?xml version="1.0"?><plist><dict><key>app</key><string>A</string></dict></plist>');
+      // pbxproj with target that has different name from folder
+      fs.writeFileSync(path.join(appAXcode, 'project.pbxproj'), `
+/* Begin PBXNativeTarget section */
+        AAAAAAAAAAAAAAAAAAAAAAAA /* MyAppA */ = {
+          isa = PBXNativeTarget;
+          productType = "com.apple.product-type.application";
+          buildConfigurationList = BBBBBBBBBBBBBBBBBBBBBBBB;
+          productName = MyAppA;
+        };
+/* End PBXNativeTarget section */
+/* Begin XCConfigurationList section */
+        BBBBBBBBBBBBBBBBBBBBBBBB /* Build configuration list for PBXNativeTarget */ = {
+          isa = XCConfigurationList;
+          buildConfigurations = (
+            CCCCCCCCCCCCCCCCCCCCCCCC,
+          );
+        };
+/* End XCConfigurationList section */
+/* Begin XCBuildConfiguration section */
+        CCCCCCCCCCCCCCCCCCCCCCCC /* Debug */ = {
+          isa = XCBuildConfiguration;
+          buildSettings = {
+            INFOPLIST_FILE = "MyAppA/Info.plist";
+          };
+          name = Debug;
+        };
+/* End XCBuildConfiguration section */
+`);
+      
+      // Create AppB with different target name
+      const appBDir = path.join(tempDir, 'AppB');
+      const appBXcode = path.join(appBDir, 'AppB.xcodeproj');
+      fs.mkdirSync(appBXcode, { recursive: true });
+      const appBTargetDir = path.join(appBDir, 'MyAppB');
+      fs.mkdirSync(appBTargetDir);
+      fs.writeFileSync(path.join(appBTargetDir, 'Info.plist'), '<?xml version="1.0"?><plist><dict><key>app</key><string>B</string></dict></plist>');
+      fs.writeFileSync(path.join(appBXcode, 'project.pbxproj'), `
+/* Begin PBXNativeTarget section */
+        DDDDDDDDDDDDDDDDDDDDDDDD /* MyAppB */ = {
+          isa = PBXNativeTarget;
+          productType = "com.apple.product-type.application";
+          buildConfigurationList = EEEEEEEEEEEEEEEEEEEEEEEE;
+          productName = MyAppB;
+        };
+/* End PBXNativeTarget section */
+/* Begin XCConfigurationList section */
+        EEEEEEEEEEEEEEEEEEEEEEEE /* Build configuration list for PBXNativeTarget */ = {
+          isa = XCConfigurationList;
+          buildConfigurations = (
+            FFFFFFFFFFFFFFFFFFFFFFFF,
+          );
+        };
+/* End XCConfigurationList section */
+/* Begin XCBuildConfiguration section */
+        FFFFFFFFFFFFFFFFFFFFFFFF /* Debug */ = {
+          isa = XCBuildConfiguration;
+          buildSettings = {
+            INFOPLIST_FILE = "MyAppB/Info.plist";
+          };
+          name = Debug;
+        };
+/* End XCBuildConfiguration section */
+`);
+      
+      // Scan from AppB
+      const discovery = discoverProject(appBXcode);
+      
+      expect(discovery.pbxprojPath).toBe(path.join(appBXcode, 'project.pbxproj'));
+      // Should find AppB's Info.plist via pbxproj parsing
+      expect(discovery.infoPlistPath).toBe(path.join(appBTargetDir, 'Info.plist'));
+      expect(discovery.targetName).toBe('MyAppB');
+    });
+
+    it('P2-A: should set dependencyScopeDir for direct .xcodeproj input', () => {
+      // Verify that dependencyScopeDir is set correctly for scoped dependency loading
+      
+      const appDir = path.join(tempDir, 'MyApp');
+      const appXcode = path.join(appDir, 'MyApp.xcodeproj');
+      fs.mkdirSync(appXcode, { recursive: true });
+      fs.writeFileSync(path.join(appXcode, 'project.pbxproj'), '// project');
+      
+      const discovery = discoverProject(appXcode);
+      
+      // dependencyScopeDir should be the .xcodeproj itself (not the parent)
+      expect(discovery.dependencyScopeDir).toBe(appXcode);
+      expect(discovery.projectScopeDir).toBe(appDir);
+    });
+  });
 });
