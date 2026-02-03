@@ -159,4 +159,163 @@ describe('discoverProject', () => {
       expect(discovery.entitlementsPath).toBeUndefined();
     });
   });
+
+  describe('P1 Fix: .xcworkspace depth too shallow', () => {
+    it('should find .xcodeproj at depth 3 within workspace', () => {
+      // Create structure:
+      // MyApp.xcworkspace/
+      //   contents.xcworkspacedata
+      // MyApp/
+      //   Sources/
+      //   MyApp.xcodeproj/   <- depth 3, was missed before!
+      //     project.pbxproj
+      const workspaceDir = path.join(tempDir, 'MyApp.xcworkspace');
+      fs.mkdirSync(workspaceDir);
+      fs.writeFileSync(path.join(workspaceDir, 'contents.xcworkspacedata'), '<?xml version="1.0"?>');
+      
+      const nestedDir = path.join(tempDir, 'MyApp', 'Sources');
+      const xcodeprojDir = path.join(tempDir, 'MyApp', 'MyApp.xcodeproj');
+      fs.mkdirSync(nestedDir, { recursive: true });
+      fs.mkdirSync(xcodeprojDir);
+      fs.writeFileSync(path.join(xcodeprojDir, 'project.pbxproj'), '// nested project');
+
+      // Pass the workspace path
+      const discovery = discoverProject(workspaceDir);
+
+      expect(discovery.isWorkspace).toBe(true);
+      expect(discovery.pbxprojPath).toBe(path.join(xcodeprojDir, 'project.pbxproj'));
+    });
+
+    it('should find .xcodeproj at depth 4 within workspace', () => {
+      // Create structure:
+      // MyApp.xcworkspace/
+      // packages/ios/MyApp/MyApp.xcodeproj/  <- depth 4
+      const workspaceDir = path.join(tempDir, 'MyApp.xcworkspace');
+      fs.mkdirSync(workspaceDir);
+      
+      const xcodeprojDir = path.join(tempDir, 'packages', 'ios', 'MyApp', 'MyApp.xcodeproj');
+      fs.mkdirSync(xcodeprojDir, { recursive: true });
+      fs.writeFileSync(path.join(xcodeprojDir, 'project.pbxproj'), '// deep nested project');
+
+      const discovery = discoverProject(workspaceDir);
+
+      expect(discovery.isWorkspace).toBe(true);
+      expect(discovery.pbxprojPath).toBe(path.join(xcodeprojDir, 'project.pbxproj'));
+    });
+  });
+
+  describe('P2 Fix: Monorepo artifact scoping', () => {
+    it('should scope Info.plist to project directory, not pick globally shallowest', () => {
+      // Create monorepo structure:
+      // monorepo/
+      //   AppA/
+      //     AppA.xcodeproj/project.pbxproj
+      //     Info.plist          <- AppA's plist
+      //   AppB/
+      //     AppB.xcodeproj/project.pbxproj
+      //     Info.plist          <- AppB's plist (should be picked when scanning AppB)
+      
+      // Create AppA
+      const appADir = path.join(tempDir, 'AppA');
+      const appAXcode = path.join(appADir, 'AppA.xcodeproj');
+      fs.mkdirSync(appAXcode, { recursive: true });
+      fs.writeFileSync(path.join(appAXcode, 'project.pbxproj'), '// AppA project');
+      fs.writeFileSync(path.join(appADir, 'Info.plist'), '<?xml version="1.0"?><plist><dict><key>CFBundleIdentifier</key><string>com.test.AppA</string></dict></plist>');
+      
+      // Create AppB (nested deeper so it appears later in scan order)
+      const appBDir = path.join(tempDir, 'AppB', 'ios');
+      const appBXcode = path.join(appBDir, 'AppB.xcodeproj');
+      fs.mkdirSync(appBXcode, { recursive: true });
+      fs.writeFileSync(path.join(appBXcode, 'project.pbxproj'), '// AppB project');
+      fs.writeFileSync(path.join(appBDir, 'Info.plist'), '<?xml version="1.0"?><plist><dict><key>CFBundleIdentifier</key><string>com.test.AppB</string></dict></plist>');
+      
+      // When scanning from AppB's xcodeproj directly, it should find AppB's Info.plist
+      const discovery = discoverProject(appBXcode);
+      
+      expect(discovery.pbxprojPath).toBe(path.join(appBXcode, 'project.pbxproj'));
+      expect(discovery.infoPlistPath).toBe(path.join(appBDir, 'Info.plist'));
+      // projectScopeDir should be set to AppB's directory
+      expect(discovery.projectScopeDir).toBe(appBDir);
+    });
+
+    it('should scope entitlements to project directory in monorepo', () => {
+      // Create AppA and AppB with different entitlements
+      const appADir = path.join(tempDir, 'AppA');
+      const appAXcode = path.join(appADir, 'AppA.xcodeproj');
+      fs.mkdirSync(appAXcode, { recursive: true });
+      fs.writeFileSync(path.join(appAXcode, 'project.pbxproj'), '// AppA');
+      fs.writeFileSync(path.join(appADir, 'AppA.entitlements'), '<?xml version="1.0"?><dict><key>keychain-access-groups</key></dict>');
+      
+      const appBDir = path.join(tempDir, 'AppB');
+      const appBXcode = path.join(appBDir, 'AppB.xcodeproj');
+      fs.mkdirSync(appBXcode, { recursive: true });
+      fs.writeFileSync(path.join(appBXcode, 'project.pbxproj'), '// AppB');
+      fs.writeFileSync(path.join(appBDir, 'AppB.entitlements'), '<?xml version="1.0"?><dict><key>aps-environment</key></dict>');
+      
+      // Scan from AppB's project - should get AppB's entitlements
+      const discovery = discoverProject(appBXcode);
+      
+      expect(discovery.entitlementsPath).toBe(path.join(appBDir, 'AppB.entitlements'));
+    });
+
+    it('should pick first xcodeproj and scope artifacts when scanning monorepo root', () => {
+      // When scanning from monorepo root, it picks the first xcodeproj found
+      // and scopes artifacts to that project's directory
+      
+      const appADir = path.join(tempDir, 'AppA');
+      const appAXcode = path.join(appADir, 'AppA.xcodeproj');
+      fs.mkdirSync(appAXcode, { recursive: true });
+      fs.writeFileSync(path.join(appAXcode, 'project.pbxproj'), '// AppA');
+      fs.writeFileSync(path.join(appADir, 'Info.plist'), '<?xml version="1.0"?><plist><dict><key>app</key><string>A</string></dict></plist>');
+      
+      const appBDir = path.join(tempDir, 'AppB');
+      const appBXcode = path.join(appBDir, 'AppB.xcodeproj');
+      fs.mkdirSync(appBXcode, { recursive: true });
+      fs.writeFileSync(path.join(appBXcode, 'project.pbxproj'), '// AppB');
+      fs.writeFileSync(path.join(appBDir, 'Info.plist'), '<?xml version="1.0"?><plist><dict><key>app</key><string>B</string></dict></plist>');
+      
+      // Scan from root - will pick first xcodeproj (alphabetical: AppA)
+      const discovery = discoverProject(tempDir);
+      
+      // Should scope to AppA's directory
+      expect(discovery.projectScopeDir).toBe(appADir);
+      expect(discovery.infoPlistPath).toBe(path.join(appADir, 'Info.plist'));
+    });
+
+    it('should handle workspace in monorepo with correct scoping', () => {
+      // Monorepo structure:
+      // MyMonorepo.xcworkspace/
+      // packages/
+      //   AppA/
+      //     AppA.xcodeproj/project.pbxproj
+      //     Info.plist
+      //   AppB/
+      //     AppB.xcodeproj/project.pbxproj
+      //     Info.plist
+      
+      const workspaceDir = path.join(tempDir, 'MyMonorepo.xcworkspace');
+      fs.mkdirSync(workspaceDir);
+      
+      const appADir = path.join(tempDir, 'packages', 'AppA');
+      const appAXcode = path.join(appADir, 'AppA.xcodeproj');
+      fs.mkdirSync(appAXcode, { recursive: true });
+      fs.writeFileSync(path.join(appAXcode, 'project.pbxproj'), '// AppA');
+      fs.writeFileSync(path.join(appADir, 'Info.plist'), '<?xml version="1.0"?><plist><dict><key>app</key><string>A</string></dict></plist>');
+      
+      const appBDir = path.join(tempDir, 'packages', 'AppB');
+      const appBXcode = path.join(appBDir, 'AppB.xcodeproj');
+      fs.mkdirSync(appBXcode, { recursive: true });
+      fs.writeFileSync(path.join(appBXcode, 'project.pbxproj'), '// AppB');
+      fs.writeFileSync(path.join(appBDir, 'Info.plist'), '<?xml version="1.0"?><plist><dict><key>app</key><string>B</string></dict></plist>');
+      
+      // Scan from workspace - picks first project and scopes correctly
+      const discovery = discoverProject(workspaceDir);
+      
+      expect(discovery.isWorkspace).toBe(true);
+      expect(discovery.projectScopeDir).toBeDefined();
+      // The Info.plist should be from the same directory as the selected xcodeproj
+      const scopeDir = discovery.projectScopeDir!;
+      expect(discovery.infoPlistPath).toBe(path.join(scopeDir, 'Info.plist'));
+    });
+  });
 });

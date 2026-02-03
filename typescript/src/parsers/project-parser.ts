@@ -13,6 +13,8 @@ import type { Dependency, ScanContext } from '../types/index.js';
  */
 export interface ProjectDiscovery {
   projectPath: string;
+  /** P2 FIX: Scoped directory for artifacts (parent of .xcodeproj) to prevent monorepo mixing */
+  projectScopeDir?: string;
   infoPlistPath?: string;
   entitlementsPath?: string;
   pbxprojPath?: string;
@@ -92,6 +94,8 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
     
     const discovery: ProjectDiscovery = {
       projectPath: basePath,
+      // P2 FIX: Scope is the parent of .xcodeproj
+      projectScopeDir: basePath,
       isWorkspace: false,
     };
     
@@ -115,18 +119,22 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
       isWorkspace: true,
     };
     
-    // Look for .xcodeproj siblings
-    const xcodeprojs = findFilesRecursive(basePath, (name) => name.endsWith('.xcodeproj'), 2);
+    // Look for .xcodeproj within workspace (P1 FIX: use full depth, not 2)
+    const xcodeprojs = findFilesRecursive(basePath, (name) => name.endsWith('.xcodeproj'), MAX_SEARCH_DEPTH);
     for (const xcodeprojPath of xcodeprojs) {
       const pbxprojPath = path.join(xcodeprojPath, 'project.pbxproj');
       if (fs.existsSync(pbxprojPath)) {
         discovery.pbxprojPath = pbxprojPath;
+        // P2 FIX: Scope artifact search to project's directory
+        discovery.projectScopeDir = path.dirname(xcodeprojPath);
         break;
       }
     }
     
-    discoverInfoPlist(basePath, discovery);
-    discoverEntitlements(basePath, discovery);
+    // P2 FIX: Search for artifacts within the project scope, not the entire basePath
+    const artifactSearchDir = discovery.projectScopeDir || basePath;
+    discoverInfoPlist(artifactSearchDir, discovery);
+    discoverEntitlements(artifactSearchDir, discovery);
     
     return discovery;
   }
@@ -149,12 +157,16 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
     const pbxprojPath = path.join(xcodeprojPath, 'project.pbxproj');
     if (fs.existsSync(pbxprojPath)) {
       discovery.pbxprojPath = pbxprojPath;
+      // P2 FIX: Scope artifact search to project's directory
+      discovery.projectScopeDir = path.dirname(xcodeprojPath);
       break;
     }
   }
   
-  discoverInfoPlist(basePath, discovery);
-  discoverEntitlements(basePath, discovery);
+  // P2 FIX: Search for artifacts within the project scope to avoid monorepo mixing
+  const artifactSearchDir = discovery.projectScopeDir || basePath;
+  discoverInfoPlist(artifactSearchDir, discovery);
+  discoverEntitlements(artifactSearchDir, discovery);
   
   return discovery;
 }
@@ -227,9 +239,9 @@ export function createScanContext(discovery: ProjectDiscovery): ScanContext {
     }
   }
   
-  // Load dependencies
+  // Load dependencies (P2 FIX: scope to project directory to prevent monorepo mixing)
   try {
-    dependencies = loadAllDependencies(discovery.projectPath);
+    dependencies = loadAllDependencies(discovery.projectScopeDir || discovery.projectPath);
   } catch (error) {
     console.warn(`Warning: Could not load dependencies: ${error}`);
   }
