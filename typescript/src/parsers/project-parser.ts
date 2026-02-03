@@ -83,6 +83,26 @@ function containsSiblingXcodeproj(dir: string, currentXcodeprojPath?: string): b
 }
 
 /**
+ * P2-C FIX: Check if a directory contains multiple .xcodeproj bundles (monorepo indicator)
+ * Used to skip root-level artifact fallback checks in monorepos
+ */
+function hasMultipleXcodeprojs(dir: string): boolean {
+  try {
+    const entries = fs.readdirSync(dir);
+    let count = 0;
+    for (const entry of entries) {
+      if (entry.endsWith('.xcodeproj') && !entry.includes('Pods')) {
+        count++;
+        if (count >= 2) return true;
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return false;
+}
+
+/**
  * Recursively find files matching a pattern
  * P2-B FIX: Can exclude directories containing sibling .xcodeproj files
  */
@@ -308,6 +328,8 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
         if (fs.existsSync(pbxprojPath)) {
           discovery.pbxprojPath = pbxprojPath;
           discovery.projectScopeDir = path.dirname(mainProject);
+          // P1 FIX: Set dependencyScopeDir for workspace scans to prevent picking up sibling lockfiles
+          discovery.dependencyScopeDir = mainProject;
           
           // P2 FIX: Get artifacts from pbxproj
           const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(mainProject));
@@ -339,6 +361,8 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
         if (fs.existsSync(pbxprojPath)) {
           discovery.pbxprojPath = pbxprojPath;
           discovery.projectScopeDir = path.dirname(xcodeprojPath);
+          // P1 FIX: Set dependencyScopeDir for workspace fallback scans
+          discovery.dependencyScopeDir = xcodeprojPath;
           
           // P2 FIX: Try to get artifacts from pbxproj
           const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(xcodeprojPath));
@@ -393,6 +417,8 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
         if (fs.existsSync(pbxprojPath)) {
           discovery.pbxprojPath = pbxprojPath;
           discovery.projectScopeDir = path.dirname(mainProject);
+          // P1 FIX: Set dependencyScopeDir for root-level workspace discovery
+          discovery.dependencyScopeDir = mainProject;
           
           // P2 FIX: Get artifacts from pbxproj
           const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(mainProject));
@@ -425,6 +451,8 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
         discovery.pbxprojPath = pbxprojPath;
         // P2 FIX: Scope artifact search to project's directory
         discovery.projectScopeDir = path.dirname(xcodeprojPath);
+        // P1 FIX: Set dependencyScopeDir for root-level xcodeproj discovery
+        discovery.dependencyScopeDir = xcodeprojPath;
         
         // P2 FIX: Try to get artifacts from pbxproj
         const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(xcodeprojPath));
@@ -489,15 +517,28 @@ function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery, target
     }
   }
   
-  // First check root
-  const rootPlist = path.join(basePath, 'Info.plist');
-  if (fs.existsSync(rootPlist)) {
-    discovery.infoPlistPath = rootPlist;
-    return;
+  // P2-C FIX: Skip root-level check if basePath contains multiple .xcodeproj bundles (monorepo)
+  // This prevents picking up a sibling app's Info.plist that happens to be at root
+  const isMonorepoRoot = hasMultipleXcodeprojs(basePath);
+  if (!isMonorepoRoot) {
+    // First check root (only safe in single-project directories)
+    const rootPlist = path.join(basePath, 'Info.plist');
+    if (fs.existsSync(rootPlist)) {
+      discovery.infoPlistPath = rootPlist;
+      return;
+    }
   }
   
   // P2-B FIX: Recursive search with sibling project exclusion
-  const plists = findFilesRecursive(basePath, (name) => name === 'Info.plist', findOptions);
+  let plists = findFilesRecursive(basePath, (name) => name === 'Info.plist', findOptions);
+  
+  // P2-C FIX: If monorepo root, filter out root-level Info.plist from recursive results too
+  // (recursive search finds files in basePath directory as well)
+  if (isMonorepoRoot) {
+    const rootPlist = path.join(basePath, 'Info.plist');
+    plists = plists.filter(p => path.resolve(p) !== path.resolve(rootPlist));
+  }
+  
   if (plists.length > 0) {
     // Prefer shorter paths (closer to root)
     plists.sort((a, b) => a.split(path.sep).length - b.split(path.sep).length);
