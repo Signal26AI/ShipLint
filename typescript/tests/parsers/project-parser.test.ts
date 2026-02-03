@@ -1,11 +1,12 @@
 /**
  * Tests for project-parser.ts
  * Covers bug fixes for xcodeproj path handling and recursive discovery
+ * P1/P2: Tests for workspace parsing and pbxproj artifact extraction
  */
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { discoverProject } from '../../src/parsers/project-parser';
+import { discoverProject, parsePbxprojForArtifacts } from '../../src/parsers/project-parser';
 
 describe('discoverProject', () => {
   let tempDir: string;
@@ -316,6 +317,303 @@ describe('discoverProject', () => {
       // The Info.plist should be from the same directory as the selected xcodeproj
       const scopeDir = discovery.projectScopeDir!;
       expect(discovery.infoPlistPath).toBe(path.join(scopeDir, 'Info.plist'));
+    });
+  });
+
+  describe('P2 Fix: Parse pbxproj for explicit artifact paths', () => {
+    it('should extract INFOPLIST_FILE from pbxproj', () => {
+      // Create project structure
+      const projectDir = path.join(tempDir, 'MyApp');
+      const xcodeprojDir = path.join(projectDir, 'MyApp.xcodeproj');
+      fs.mkdirSync(xcodeprojDir, { recursive: true });
+      
+      // Create Info.plist in nested location
+      const plistDir = path.join(projectDir, 'Sources', 'MyApp');
+      fs.mkdirSync(plistDir, { recursive: true });
+      fs.writeFileSync(path.join(plistDir, 'Info.plist'), '<?xml version="1.0"?><plist></plist>');
+      
+      // Create pbxproj with INFOPLIST_FILE setting
+      const pbxprojContent = `
+// !$*UTF8*$!
+{
+  archiveVersion = 1;
+  objectVersion = 56;
+  objects = {
+    /* Build configuration */
+    DEADBEEF /* Debug */ = {
+      isa = XCBuildConfiguration;
+      buildSettings = {
+        INFOPLIST_FILE = "Sources/MyApp/Info.plist";
+        PRODUCT_NAME = "$(TARGET_NAME)";
+      };
+      name = Debug;
+    };
+  };
+}`;
+      fs.writeFileSync(path.join(xcodeprojDir, 'project.pbxproj'), pbxprojContent);
+      
+      const artifacts = parsePbxprojForArtifacts(
+        path.join(xcodeprojDir, 'project.pbxproj'),
+        projectDir
+      );
+      
+      expect(artifacts.infoPlistPath).toBe(path.join(plistDir, 'Info.plist'));
+    });
+
+    it('should extract CODE_SIGN_ENTITLEMENTS from pbxproj', () => {
+      const projectDir = path.join(tempDir, 'MyApp');
+      const xcodeprojDir = path.join(projectDir, 'MyApp.xcodeproj');
+      fs.mkdirSync(xcodeprojDir, { recursive: true });
+      
+      // Create entitlements file
+      fs.writeFileSync(path.join(projectDir, 'MyApp.entitlements'), '<?xml version="1.0"?>');
+      
+      const pbxprojContent = `
+// !$*UTF8*$!
+{
+  buildSettings = {
+    CODE_SIGN_ENTITLEMENTS = "MyApp.entitlements";
+    INFOPLIST_FILE = "Info.plist";
+  };
+}`;
+      fs.writeFileSync(path.join(xcodeprojDir, 'project.pbxproj'), pbxprojContent);
+      
+      const artifacts = parsePbxprojForArtifacts(
+        path.join(xcodeprojDir, 'project.pbxproj'),
+        projectDir
+      );
+      
+      expect(artifacts.entitlementsPath).toBe(path.join(projectDir, 'MyApp.entitlements'));
+    });
+
+    it('should handle INFOPLIST_FILE without quotes', () => {
+      const projectDir = path.join(tempDir, 'MyApp');
+      const xcodeprojDir = path.join(projectDir, 'MyApp.xcodeproj');
+      fs.mkdirSync(xcodeprojDir, { recursive: true });
+      
+      fs.writeFileSync(path.join(projectDir, 'Info.plist'), '<?xml version="1.0"?>');
+      
+      const pbxprojContent = `
+buildSettings = {
+  INFOPLIST_FILE = MyApp/Info.plist;
+};`;
+      fs.writeFileSync(path.join(xcodeprojDir, 'project.pbxproj'), pbxprojContent);
+      
+      // Create the nested directory and file
+      fs.mkdirSync(path.join(projectDir, 'MyApp'), { recursive: true });
+      fs.writeFileSync(path.join(projectDir, 'MyApp', 'Info.plist'), '<?xml version="1.0"?>');
+      
+      const artifacts = parsePbxprojForArtifacts(
+        path.join(xcodeprojDir, 'project.pbxproj'),
+        projectDir
+      );
+      
+      expect(artifacts.infoPlistPath).toBe(path.join(projectDir, 'MyApp', 'Info.plist'));
+    });
+
+    it('should handle $(SRCROOT) prefix in paths', () => {
+      const projectDir = path.join(tempDir, 'MyApp');
+      const xcodeprojDir = path.join(projectDir, 'MyApp.xcodeproj');
+      fs.mkdirSync(xcodeprojDir, { recursive: true });
+      
+      fs.writeFileSync(path.join(projectDir, 'Info.plist'), '<?xml version="1.0"?>');
+      
+      const pbxprojContent = `
+buildSettings = {
+  INFOPLIST_FILE = "$(SRCROOT)/Info.plist";
+};`;
+      fs.writeFileSync(path.join(xcodeprojDir, 'project.pbxproj'), pbxprojContent);
+      
+      const artifacts = parsePbxprojForArtifacts(
+        path.join(xcodeprojDir, 'project.pbxproj'),
+        projectDir
+      );
+      
+      expect(artifacts.infoPlistPath).toBe(path.join(projectDir, 'Info.plist'));
+    });
+
+    it('should return empty result for non-existent pbxproj', () => {
+      const artifacts = parsePbxprojForArtifacts(
+        '/nonexistent/project.pbxproj',
+        '/nonexistent'
+      );
+      
+      expect(artifacts.infoPlistPath).toBeUndefined();
+      expect(artifacts.entitlementsPath).toBeUndefined();
+    });
+
+    it('should return empty result when artifact files do not exist', () => {
+      const projectDir = path.join(tempDir, 'MyApp');
+      const xcodeprojDir = path.join(projectDir, 'MyApp.xcodeproj');
+      fs.mkdirSync(xcodeprojDir, { recursive: true });
+      
+      // pbxproj references files that don't exist
+      const pbxprojContent = `
+buildSettings = {
+  INFOPLIST_FILE = "NonExistent/Info.plist";
+  CODE_SIGN_ENTITLEMENTS = "NonExistent.entitlements";
+};`;
+      fs.writeFileSync(path.join(xcodeprojDir, 'project.pbxproj'), pbxprojContent);
+      
+      const artifacts = parsePbxprojForArtifacts(
+        path.join(xcodeprojDir, 'project.pbxproj'),
+        projectDir
+      );
+      
+      // Should return undefined for non-existent files
+      expect(artifacts.infoPlistPath).toBeUndefined();
+      expect(artifacts.entitlementsPath).toBeUndefined();
+    });
+
+    it('should integrate pbxproj parsing in discoverProject', () => {
+      // Create project with pbxproj that specifies Info.plist path
+      const projectDir = path.join(tempDir, 'MyApp');
+      const xcodeprojDir = path.join(projectDir, 'MyApp.xcodeproj');
+      fs.mkdirSync(xcodeprojDir, { recursive: true });
+      
+      // Create Info.plist in nested location (not root)
+      const nestedDir = path.join(projectDir, 'Configs', 'Debug');
+      fs.mkdirSync(nestedDir, { recursive: true });
+      fs.writeFileSync(path.join(nestedDir, 'Info.plist'), '<?xml version="1.0"?><plist></plist>');
+      
+      // Also create a decoy Info.plist at root (should NOT be picked)
+      fs.writeFileSync(path.join(projectDir, 'Info.plist'), '<?xml version="1.0"?><plist><wrong/></plist>');
+      
+      // pbxproj specifies the nested path
+      const pbxprojContent = `
+buildSettings = {
+  INFOPLIST_FILE = "Configs/Debug/Info.plist";
+};`;
+      fs.writeFileSync(path.join(xcodeprojDir, 'project.pbxproj'), pbxprojContent);
+      
+      const discovery = discoverProject(xcodeprojDir);
+      
+      // Should use the explicitly specified path, not the root one
+      expect(discovery.infoPlistPath).toBe(path.join(nestedDir, 'Info.plist'));
+    });
+
+    it('should fall back to directory search when pbxproj has no artifact paths', () => {
+      const projectDir = path.join(tempDir, 'MyApp');
+      const xcodeprojDir = path.join(projectDir, 'MyApp.xcodeproj');
+      fs.mkdirSync(xcodeprojDir, { recursive: true });
+      
+      // pbxproj without INFOPLIST_FILE
+      const pbxprojContent = `
+buildSettings = {
+  PRODUCT_NAME = "MyApp";
+};`;
+      fs.writeFileSync(path.join(xcodeprojDir, 'project.pbxproj'), pbxprojContent);
+      
+      // Create Info.plist that should be found by directory search
+      fs.writeFileSync(path.join(projectDir, 'Info.plist'), '<?xml version="1.0"?>');
+      
+      const discovery = discoverProject(xcodeprojDir);
+      
+      // Should fall back to directory search
+      expect(discovery.infoPlistPath).toBe(path.join(projectDir, 'Info.plist'));
+    });
+  });
+
+  describe('P1 Fix: Parse workspace data for project references', () => {
+    it('should use workspace data to find correct project', () => {
+      // Create workspace with contents.xcworkspacedata
+      const workspaceDir = path.join(tempDir, 'MyApp.xcworkspace');
+      fs.mkdirSync(workspaceDir);
+      
+      // Create main project
+      const mainProjectDir = path.join(tempDir, 'MyApp');
+      const mainXcodeproj = path.join(mainProjectDir, 'MyApp.xcodeproj');
+      fs.mkdirSync(mainXcodeproj, { recursive: true });
+      fs.writeFileSync(path.join(mainXcodeproj, 'project.pbxproj'), '// main');
+      fs.writeFileSync(path.join(mainProjectDir, 'Info.plist'), '<?xml version="1.0"?><main/>');
+      
+      // Create Pods project (should be skipped)
+      const podsDir = path.join(tempDir, 'Pods');
+      const podsXcodeproj = path.join(podsDir, 'Pods.xcodeproj');
+      fs.mkdirSync(podsXcodeproj, { recursive: true });
+      fs.writeFileSync(path.join(podsXcodeproj, 'project.pbxproj'), '// pods');
+      fs.writeFileSync(path.join(podsDir, 'Info.plist'), '<?xml version="1.0"?><pods/>');
+      
+      // Workspace data references both projects
+      const workspaceData = `<?xml version="1.0" encoding="UTF-8"?>
+<Workspace version="1.0">
+   <FileRef location="group:MyApp/MyApp.xcodeproj"/>
+   <FileRef location="group:Pods/Pods.xcodeproj"/>
+</Workspace>`;
+      fs.writeFileSync(path.join(workspaceDir, 'contents.xcworkspacedata'), workspaceData);
+      
+      const discovery = discoverProject(workspaceDir);
+      
+      // Should find the main project, not Pods
+      expect(discovery.pbxprojPath).toBe(path.join(mainXcodeproj, 'project.pbxproj'));
+      expect(discovery.workspaceProjects).toBeDefined();
+      expect(discovery.workspaceProjects!.length).toBe(1); // Only main project, not Pods
+      expect(discovery.workspaceProjects![0]).toBe(mainXcodeproj);
+    });
+
+    it('should handle workspace with nested project structure', () => {
+      // Workspace references a project in a subdirectory
+      const workspaceDir = path.join(tempDir, 'MyWorkspace.xcworkspace');
+      fs.mkdirSync(workspaceDir);
+      
+      // Create nested project
+      const nestedProjectDir = path.join(tempDir, 'packages', 'ios', 'MyApp');
+      const nestedXcodeproj = path.join(nestedProjectDir, 'MyApp.xcodeproj');
+      fs.mkdirSync(nestedXcodeproj, { recursive: true });
+      fs.writeFileSync(path.join(nestedXcodeproj, 'project.pbxproj'), '// nested');
+      fs.writeFileSync(path.join(nestedProjectDir, 'Info.plist'), '<?xml version="1.0"?>');
+      
+      // Workspace data references the nested project
+      const workspaceData = `<?xml version="1.0" encoding="UTF-8"?>
+<Workspace version="1.0">
+   <FileRef location="group:packages/ios/MyApp/MyApp.xcodeproj"/>
+</Workspace>`;
+      fs.writeFileSync(path.join(workspaceDir, 'contents.xcworkspacedata'), workspaceData);
+      
+      const discovery = discoverProject(workspaceDir);
+      
+      expect(discovery.pbxprojPath).toBe(path.join(nestedXcodeproj, 'project.pbxproj'));
+      expect(discovery.projectScopeDir).toBe(nestedProjectDir);
+      expect(discovery.infoPlistPath).toBe(path.join(nestedProjectDir, 'Info.plist'));
+    });
+
+    it('should skip Pods in workspace and use correct scoping', () => {
+      // This tests the specific issue: workspace contains multiple projects,
+      // we should pick the right one and scope artifacts correctly
+      
+      const workspaceDir = path.join(tempDir, 'MyApp.xcworkspace');
+      fs.mkdirSync(workspaceDir);
+      
+      // Main app project with nested Info.plist
+      const appDir = path.join(tempDir, 'MyApp');
+      const appXcodeproj = path.join(appDir, 'MyApp.xcodeproj');
+      fs.mkdirSync(appXcodeproj, { recursive: true });
+      fs.writeFileSync(path.join(appXcodeproj, 'project.pbxproj'), `
+buildSettings = {
+  INFOPLIST_FILE = "MyApp/Info.plist";
+};`);
+      const appInfoDir = path.join(appDir, 'MyApp');
+      fs.mkdirSync(appInfoDir, { recursive: true });
+      fs.writeFileSync(path.join(appInfoDir, 'Info.plist'), '<?xml version="1.0"?><app/>');
+      
+      // Pods project
+      const podsDir = path.join(tempDir, 'Pods');
+      const podsXcodeproj = path.join(podsDir, 'Pods.xcodeproj');
+      fs.mkdirSync(podsXcodeproj, { recursive: true });
+      fs.writeFileSync(path.join(podsXcodeproj, 'project.pbxproj'), '// pods');
+      
+      const workspaceData = `<?xml version="1.0" encoding="UTF-8"?>
+<Workspace version="1.0">
+   <FileRef location="group:MyApp/MyApp.xcodeproj"/>
+   <FileRef location="group:Pods/Pods.xcodeproj"/>
+</Workspace>`;
+      fs.writeFileSync(path.join(workspaceDir, 'contents.xcworkspacedata'), workspaceData);
+      
+      const discovery = discoverProject(workspaceDir);
+      
+      // Should find app project and use pbxproj path for Info.plist
+      expect(discovery.pbxprojPath).toBe(path.join(appXcodeproj, 'project.pbxproj'));
+      expect(discovery.infoPlistPath).toBe(path.join(appInfoDir, 'Info.plist'));
     });
   });
 });

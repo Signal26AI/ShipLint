@@ -1,11 +1,17 @@
 /**
  * Parser for Xcode project structure
+ * 
+ * P1/P2 Fix: Now parses actual project files instead of relying on directory heuristics.
+ * - Workspaces: Parses contents.xcworkspacedata for project references
+ * - Projects: Parses project.pbxproj for explicit artifact paths (Info.plist, entitlements)
+ * - Falls back to directory heuristics only when parsing fails
  */
 import * as fs from 'fs';
 import * as path from 'path';
 import { parsePlist } from './plist-parser.js';
 import { parseEntitlements } from './entitlements-parser.js';
 import { parseProjectFrameworks, loadAllDependencies } from './framework-detector.js';
+import { getWorkspaceProjects, parseWorkspaceData } from './workspace-parser.js';
 import type { Dependency, ScanContext } from '../types/index.js';
 
 /**
@@ -19,6 +25,18 @@ export interface ProjectDiscovery {
   entitlementsPath?: string;
   pbxprojPath?: string;
   isWorkspace: boolean;
+  /** P1/P2: All projects found in workspace (when applicable) */
+  workspaceProjects?: string[];
+}
+
+/**
+ * Artifact paths extracted from project.pbxproj
+ */
+export interface PbxprojArtifacts {
+  infoPlistPath?: string;
+  entitlementsPath?: string;
+  /** The target name these artifacts came from */
+  targetName?: string;
 }
 
 /**
@@ -77,7 +95,80 @@ function findFilesRecursive(
 }
 
 /**
+ * P2 FIX: Parse project.pbxproj to extract explicit artifact paths
+ * 
+ * Looks for build settings like:
+ * - INFOPLIST_FILE = "MyApp/Info.plist";
+ * - CODE_SIGN_ENTITLEMENTS = "MyApp/MyApp.entitlements";
+ * 
+ * @param pbxprojPath Path to project.pbxproj file
+ * @param projectDir Directory containing the .xcodeproj
+ * @returns Resolved artifact paths
+ */
+export function parsePbxprojForArtifacts(pbxprojPath: string, projectDir: string): PbxprojArtifacts {
+  const result: PbxprojArtifacts = {};
+  
+  if (!fs.existsSync(pbxprojPath)) {
+    return result;
+  }
+  
+  try {
+    const content = fs.readFileSync(pbxprojPath, 'utf-8');
+    
+    // Parse build configurations to find artifact paths
+    // The pbxproj format has buildSettings dictionaries with these keys
+    
+    // Find INFOPLIST_FILE - may have quotes or not
+    // Match patterns like: INFOPLIST_FILE = "MyApp/Info.plist"; or INFOPLIST_FILE = MyApp/Info.plist;
+    const infoPlistMatch = content.match(/INFOPLIST_FILE\s*=\s*"?([^";]+)"?\s*;/);
+    if (infoPlistMatch) {
+      let plistPath = infoPlistMatch[1].trim();
+      // Remove $(SRCROOT)/ prefix if present
+      plistPath = plistPath.replace(/\$\(SRCROOT\)\/?/, '');
+      // Resolve relative to project directory
+      const resolvedPath = path.resolve(projectDir, plistPath);
+      if (fs.existsSync(resolvedPath)) {
+        result.infoPlistPath = resolvedPath;
+      }
+    }
+    
+    // Find CODE_SIGN_ENTITLEMENTS
+    const entitlementsMatch = content.match(/CODE_SIGN_ENTITLEMENTS\s*=\s*"?([^";]+)"?\s*;/);
+    if (entitlementsMatch) {
+      let entPath = entitlementsMatch[1].trim();
+      // Remove $(SRCROOT)/ prefix if present
+      entPath = entPath.replace(/\$\(SRCROOT\)\/?/, '');
+      // Resolve relative to project directory
+      const resolvedPath = path.resolve(projectDir, entPath);
+      if (fs.existsSync(resolvedPath)) {
+        result.entitlementsPath = resolvedPath;
+      }
+    }
+    
+    // Try to identify the main target name (useful for debugging)
+    // Look for the first non-test native target
+    const targetMatches = content.matchAll(/\/\* ([^*]+) \*\/\s*=\s*\{[^}]*isa\s*=\s*PBXNativeTarget/g);
+    for (const match of targetMatches) {
+      const targetName = match[1];
+      // Skip test targets
+      if (!targetName.toLowerCase().includes('test')) {
+        result.targetName = targetName;
+        break;
+      }
+    }
+    
+  } catch (error) {
+    // Parsing failed - return empty result, caller will fall back to heuristics
+    console.warn(`Warning: Could not parse pbxproj for artifacts: ${error}`);
+  }
+  
+  return result;
+}
+
+/**
  * Discovers project files in a directory
+ * 
+ * P1/P2 Fix: Now uses workspace parsing and explicit artifact paths
  */
 export function discoverProject(inputPath: string): ProjectDiscovery {
   const stat = fs.statSync(inputPath);
@@ -101,16 +192,29 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
     
     if (fs.existsSync(pbxprojPath)) {
       discovery.pbxprojPath = pbxprojPath;
+      
+      // P2 FIX: Try to get explicit artifact paths from pbxproj
+      const artifacts = parsePbxprojForArtifacts(pbxprojPath, basePath);
+      if (artifacts.infoPlistPath) {
+        discovery.infoPlistPath = artifacts.infoPlistPath;
+      }
+      if (artifacts.entitlementsPath) {
+        discovery.entitlementsPath = artifacts.entitlementsPath;
+      }
     }
     
-    // Still look for Info.plist and entitlements in parent directory
-    discoverInfoPlist(basePath, discovery);
-    discoverEntitlements(basePath, discovery);
+    // Fall back to directory search if artifacts not found via parsing
+    if (!discovery.infoPlistPath) {
+      discoverInfoPlist(basePath, discovery);
+    }
+    if (!discovery.entitlementsPath) {
+      discoverEntitlements(basePath, discovery);
+    }
     
     return discovery;
   }
   
-  // Handle .xcworkspace path similarly
+  // P1 FIX: Handle .xcworkspace by parsing contents.xcworkspacedata
   if (stat.isDirectory() && inputPath.endsWith('.xcworkspace')) {
     const basePath = path.dirname(inputPath);
     
@@ -119,22 +223,69 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
       isWorkspace: true,
     };
     
-    // Look for .xcodeproj within workspace (P1 FIX: use full depth, not 2)
-    const xcodeprojs = findFilesRecursive(basePath, (name) => name.endsWith('.xcodeproj'), MAX_SEARCH_DEPTH);
-    for (const xcodeprojPath of xcodeprojs) {
-      const pbxprojPath = path.join(xcodeprojPath, 'project.pbxproj');
-      if (fs.existsSync(pbxprojPath)) {
-        discovery.pbxprojPath = pbxprojPath;
-        // P2 FIX: Scope artifact search to project's directory
-        discovery.projectScopeDir = path.dirname(xcodeprojPath);
-        break;
+    // P1 FIX: Parse workspace data to get actual project references
+    try {
+      const workspaceProjects = getWorkspaceProjects(inputPath);
+      discovery.workspaceProjects = workspaceProjects;
+      
+      if (workspaceProjects.length > 0) {
+        // Use the first main project
+        const mainProject = workspaceProjects[0];
+        const pbxprojPath = path.join(mainProject, 'project.pbxproj');
+        
+        if (fs.existsSync(pbxprojPath)) {
+          discovery.pbxprojPath = pbxprojPath;
+          discovery.projectScopeDir = path.dirname(mainProject);
+          
+          // P2 FIX: Get artifacts from pbxproj
+          const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(mainProject));
+          if (artifacts.infoPlistPath) {
+            discovery.infoPlistPath = artifacts.infoPlistPath;
+          }
+          if (artifacts.entitlementsPath) {
+            discovery.entitlementsPath = artifacts.entitlementsPath;
+          }
+        }
+      }
+    } catch (error) {
+      // Workspace parsing failed - fall back to directory scan
+      console.warn(`Warning: Workspace parsing failed, using directory scan: ${error}`);
+    }
+    
+    // Fall back to directory scan if workspace parsing didn't find projects
+    if (!discovery.pbxprojPath) {
+      const xcodeprojs = findFilesRecursive(basePath, (name) => name.endsWith('.xcodeproj'), MAX_SEARCH_DEPTH);
+      // Filter out Pods
+      const mainXcodeprojs = xcodeprojs.filter(p => !p.includes('/Pods/') && !p.endsWith('Pods.xcodeproj'));
+      const projectList = mainXcodeprojs.length > 0 ? mainXcodeprojs : xcodeprojs;
+      
+      for (const xcodeprojPath of projectList) {
+        const pbxprojPath = path.join(xcodeprojPath, 'project.pbxproj');
+        if (fs.existsSync(pbxprojPath)) {
+          discovery.pbxprojPath = pbxprojPath;
+          discovery.projectScopeDir = path.dirname(xcodeprojPath);
+          
+          // P2 FIX: Try to get artifacts from pbxproj
+          const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(xcodeprojPath));
+          if (artifacts.infoPlistPath) {
+            discovery.infoPlistPath = artifacts.infoPlistPath;
+          }
+          if (artifacts.entitlementsPath) {
+            discovery.entitlementsPath = artifacts.entitlementsPath;
+          }
+          break;
+        }
       }
     }
     
     // P2 FIX: Search for artifacts within the project scope, not the entire basePath
     const artifactSearchDir = discovery.projectScopeDir || basePath;
-    discoverInfoPlist(artifactSearchDir, discovery);
-    discoverEntitlements(artifactSearchDir, discovery);
+    if (!discovery.infoPlistPath) {
+      discoverInfoPlist(artifactSearchDir, discovery);
+    }
+    if (!discovery.entitlementsPath) {
+      discoverEntitlements(artifactSearchDir, discovery);
+    }
     
     return discovery;
   }
@@ -150,29 +301,77 @@ export function discoverProject(inputPath: string): ProjectDiscovery {
   const xcworkspaces = findFilesRecursive(basePath, (name) => name.endsWith('.xcworkspace'));
   if (xcworkspaces.length > 0) {
     discovery.isWorkspace = true;
+    
+    // P1 FIX: If workspace found, try to parse it for project references
+    try {
+      const workspaceProjects = getWorkspaceProjects(xcworkspaces[0]);
+      discovery.workspaceProjects = workspaceProjects;
+      
+      if (workspaceProjects.length > 0) {
+        const mainProject = workspaceProjects[0];
+        const pbxprojPath = path.join(mainProject, 'project.pbxproj');
+        
+        if (fs.existsSync(pbxprojPath)) {
+          discovery.pbxprojPath = pbxprojPath;
+          discovery.projectScopeDir = path.dirname(mainProject);
+          
+          // P2 FIX: Get artifacts from pbxproj
+          const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(mainProject));
+          if (artifacts.infoPlistPath) {
+            discovery.infoPlistPath = artifacts.infoPlistPath;
+          }
+          if (artifacts.entitlementsPath) {
+            discovery.entitlementsPath = artifacts.entitlementsPath;
+          }
+        }
+      }
+    } catch {
+      // Fall through to directory scan
+    }
   }
   
-  const xcodeprojs = findFilesRecursive(basePath, (name) => name.endsWith('.xcodeproj'));
-  for (const xcodeprojPath of xcodeprojs) {
-    const pbxprojPath = path.join(xcodeprojPath, 'project.pbxproj');
-    if (fs.existsSync(pbxprojPath)) {
-      discovery.pbxprojPath = pbxprojPath;
-      // P2 FIX: Scope artifact search to project's directory
-      discovery.projectScopeDir = path.dirname(xcodeprojPath);
-      break;
+  // Fall back to directory scan for xcodeproj
+  if (!discovery.pbxprojPath) {
+    const xcodeprojs = findFilesRecursive(basePath, (name) => name.endsWith('.xcodeproj'));
+    // Filter out Pods
+    const mainXcodeprojs = xcodeprojs.filter(p => !p.includes('/Pods/') && !p.endsWith('Pods.xcodeproj'));
+    const projectList = mainXcodeprojs.length > 0 ? mainXcodeprojs : xcodeprojs;
+    
+    for (const xcodeprojPath of projectList) {
+      const pbxprojPath = path.join(xcodeprojPath, 'project.pbxproj');
+      if (fs.existsSync(pbxprojPath)) {
+        discovery.pbxprojPath = pbxprojPath;
+        // P2 FIX: Scope artifact search to project's directory
+        discovery.projectScopeDir = path.dirname(xcodeprojPath);
+        
+        // P2 FIX: Try to get artifacts from pbxproj
+        const artifacts = parsePbxprojForArtifacts(pbxprojPath, path.dirname(xcodeprojPath));
+        if (artifacts.infoPlistPath) {
+          discovery.infoPlistPath = artifacts.infoPlistPath;
+        }
+        if (artifacts.entitlementsPath) {
+          discovery.entitlementsPath = artifacts.entitlementsPath;
+        }
+        break;
+      }
     }
   }
   
   // P2 FIX: Search for artifacts within the project scope to avoid monorepo mixing
   const artifactSearchDir = discovery.projectScopeDir || basePath;
-  discoverInfoPlist(artifactSearchDir, discovery);
-  discoverEntitlements(artifactSearchDir, discovery);
+  if (!discovery.infoPlistPath) {
+    discoverInfoPlist(artifactSearchDir, discovery);
+  }
+  if (!discovery.entitlementsPath) {
+    discoverEntitlements(artifactSearchDir, discovery);
+  }
   
   return discovery;
 }
 
 /**
  * Discovers Info.plist in project directory (recursive)
+ * This is the fallback when pbxproj parsing doesn't yield a path
  */
 function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery): void {
   // First check root
@@ -193,6 +392,7 @@ function discoverInfoPlist(basePath: string, discovery: ProjectDiscovery): void 
 
 /**
  * Discovers entitlements file in project directory (recursive)
+ * This is the fallback when pbxproj parsing doesn't yield a path
  */
 function discoverEntitlements(basePath: string, discovery: ProjectDiscovery): void {
   const entitlements = findFilesRecursive(basePath, (name) => name.endsWith('.entitlements'));
