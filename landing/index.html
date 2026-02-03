@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReviewShield - Know Before You Submit | iOS App Store Preflight Scanner</title>
+    <meta name="description" content="Reduce App Store rejection anxiety. Catch config and metadata issues before submission with fast, automated static analysis.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1',
+                        accent: '#22d3ee',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.6); }
+        }
+        .animate-fade-in-up {
+            animation: fadeInUp 0.6s ease-out forwards;
+            opacity: 0;
+        }
+        .animate-delay-100 { animation-delay: 0.1s; }
+        .animate-delay-200 { animation-delay: 0.2s; }
+        .animate-delay-300 { animation-delay: 0.3s; }
+        .animate-delay-400 { animation-delay: 0.4s; }
+        .pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+        .gradient-text {
+            background: linear-gradient(135deg, #6366f1 0%, #22d3ee 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .card-hover {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        /* Scroll animations */
+        .scroll-reveal {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+        .scroll-reveal.revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-slate-950/80 backdrop-blur-lg z-50 border-b border-slate-800/50">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2">
+                    <svg class="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    <span class="font-bold text-xl">ReviewShield</span>
+                </div>
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="#features" class="text-slate-400 hover:text-white transition-colors">Features</a>
+                    <a href="#how-it-works" class="text-slate-400 hover:text-white transition-colors">How It Works</a>
+                    <a href="#pricing" class="text-slate-400 hover:text-white transition-colors">Pricing</a>
+                </div>
+                <a href="#pricing" class="bg-primary hover:bg-indigo-600 px-4 py-2 rounded-lg font-medium transition-colors">
+                    Start Free Trial
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="min-h-screen flex items-center pt-16 relative overflow-hidden">
+        <!-- Background gradient -->
+        <div class="absolute inset-0 bg-gradient-to-br from-indigo-950/50 via-slate-950 to-cyan-950/30"></div>
+        <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
+        
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
+            <div class="text-center">
+                <div class="animate-fade-in-up">
+                    <span class="inline-block px-4 py-1.5 bg-primary/20 text-primary rounded-full text-sm font-medium mb-6">
+                        App Store Preflight Scanner
+                    </span>
+                </div>
+                
+                <h1 class="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 animate-fade-in-up animate-delay-100">
+                    <span class="gradient-text">Know before</span>
+                    <br>you submit
+                </h1>
+                
+                <p class="text-xl sm:text-2xl text-slate-400 max-w-2xl mx-auto mb-8 animate-fade-in-up animate-delay-200">
+                    Reduce App Store rejection anxiety by catching config and metadata issues 
+                    <span class="text-white font-medium">before</span> you hit submit.
+                </p>
+                
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up animate-delay-300">
+                    <a href="#pricing" class="w-full sm:w-auto bg-primary hover:bg-indigo-600 px-8 py-4 rounded-xl font-semibold text-lg transition-all pulse-glow">
+                        Start 14-Day Free Trial
+                    </a>
+                    <a href="#demo" class="w-full sm:w-auto border border-slate-700 hover:border-slate-500 px-8 py-4 rounded-xl font-semibold text-lg transition-colors">
+                        See Demo →
+                    </a>
+                </div>
+                
+                <p class="text-slate-500 text-sm mt-4 animate-fade-in-up animate-delay-400">
+                    No credit card required • Setup in 2 minutes
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Bar -->
+    <section class="border-y border-slate-800 bg-slate-900/50">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+                <div class="scroll-reveal">
+                    <div class="text-3xl sm:text-4xl font-bold gradient-text">60%</div>
+                    <div class="text-slate-400 mt-1">of rejections are preventable</div>
+                </div>
+                <div class="scroll-reveal">
+                    <div class="text-3xl sm:text-4xl font-bold gradient-text">&lt;30s</div>
+                    <div class="text-slate-400 mt-1">average scan time</div>
+                </div>
+                <div class="scroll-reveal">
+                    <div class="text-3xl sm:text-4xl font-bold gradient-text">50+</div>
+                    <div class="text-slate-400 mt-1">checks performed</div>
+                </div>
+                <div class="scroll-reveal">
+                    <div class="text-3xl sm:text-4xl font-bold gradient-text">$9</div>
+                    <div class="text-slate-400 mt-1">per month to start</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-24">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 scroll-reveal">
+                <h2 class="text-3xl sm:text-4xl font-bold mb-4">Catch the issues that cause rejections</h2>
+                <p class="text-slate-400 text-lg max-w-2xl mx-auto">
+                    Static analysis that runs in seconds. No devices, no simulators, no waiting.
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Feature 1 -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 card-hover scroll-reveal">
+                    <div class="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Privacy Manifests</h3>
+                    <p class="text-slate-400">Validates required privacy manifest declarations for APIs and third-party SDKs.</p>
+                </div>
+                
+                <!-- Feature 2 -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 card-hover scroll-reveal">
+                    <div class="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Info.plist Validation</h3>
+                    <p class="text-slate-400">Checks for malformed entries, missing keys, and common configuration mistakes.</p>
+                </div>
+                
+                <!-- Feature 3 -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 card-hover scroll-reveal">
+                    <div class="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Entitlements Check</h3>
+                    <p class="text-slate-400">Verifies entitlements match your provisioning profile and App Store guidelines.</p>
+                </div>
+                
+                <!-- Feature 4 -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 card-hover scroll-reveal">
+                    <div class="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Usage Descriptions</h3>
+                    <p class="text-slate-400">Ensures all permission usage strings are present and meaningful.</p>
+                </div>
+                
+                <!-- Feature 5 -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 card-hover scroll-reveal">
+                    <div class="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">ATS Exceptions</h3>
+                    <p class="text-slate-400">Flags App Transport Security exceptions that need justification.</p>
+                </div>
+                
+                <!-- Feature 6 -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 card-hover scroll-reveal">
+                    <div class="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Sign in with Apple</h3>
+                    <p class="text-slate-400">Detects third-party login SDKs and ensures SIWA compliance.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Demo Section -->
+    <section id="demo" class="py-24 bg-slate-900/30">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12 scroll-reveal">
+                <h2 class="text-3xl sm:text-4xl font-bold mb-4">See it in action</h2>
+                <p class="text-slate-400 text-lg">Real output from a ReviewShield scan</p>
+            </div>
+            
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl scroll-reveal">
+                <!-- Terminal header -->
+                <div class="bg-slate-900 px-4 py-3 flex items-center gap-2 border-b border-slate-800">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span class="ml-4 text-slate-500 text-sm font-mono">reviewshield scan ./MyApp.xcodeproj</span>
+                </div>
+                
+                <!-- Terminal content -->
+                <div class="p-6 font-mono text-sm overflow-x-auto">
+                    <div class="text-slate-500">ReviewShield v1.2.0 • Scanning MyApp...</div>
+                    <div class="mt-4"></div>
+                    
+                    <div class="text-cyan-400">━━━ Privacy Manifest ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+                    <div class="flex items-start gap-2 mt-2">
+                        <span class="text-red-400">✗</span>
+                        <span class="text-slate-300">Missing privacy manifest for <span class="text-yellow-300">NSPrivacyAccessedAPICategoryUserDefaults</span></span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="text-red-400">✗</span>
+                        <span class="text-slate-300">SDK <span class="text-yellow-300">FacebookSDK</span> requires privacy declaration</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="text-green-400">✓</span>
+                        <span class="text-slate-500">NSPrivacyTracking declared correctly</span>
+                    </div>
+                    
+                    <div class="text-cyan-400 mt-4">━━━ Info.plist ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+                    <div class="flex items-start gap-2 mt-2">
+                        <span class="text-green-400">✓</span>
+                        <span class="text-slate-500">Bundle identifier valid</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="text-green-400">✓</span>
+                        <span class="text-slate-500">Version strings formatted correctly</span>
+                    </div>
+                    
+                    <div class="text-cyan-400 mt-4">━━━ Usage Descriptions ━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+                    <div class="flex items-start gap-2 mt-2">
+                        <span class="text-yellow-400">⚠</span>
+                        <span class="text-slate-300"><span class="text-yellow-300">NSCameraUsageDescription</span> is generic: "This app needs camera access"</span>
+                    </div>
+                    <div class="pl-5 text-slate-500 text-xs">→ Tip: Be specific about why. e.g., "Take photos for your profile"</div>
+                    <div class="flex items-start gap-2 mt-1">
+                        <span class="text-red-400">✗</span>
+                        <span class="text-slate-300">Missing <span class="text-yellow-300">NSPhotoLibraryUsageDescription</span> (PHPickerViewController detected)</span>
+                    </div>
+                    
+                    <div class="text-cyan-400 mt-4">━━━ Sign in with Apple ━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+                    <div class="flex items-start gap-2 mt-2">
+                        <span class="text-red-400">✗</span>
+                        <span class="text-slate-300">Google Sign-In detected but Sign in with Apple not implemented</span>
+                    </div>
+                    <div class="pl-5 text-slate-500 text-xs">→ Required per App Store Guideline 4.8</div>
+                    
+                    <div class="mt-6 pt-4 border-t border-slate-800">
+                        <div class="flex items-center gap-4">
+                            <span class="text-red-400 font-semibold">4 errors</span>
+                            <span class="text-yellow-400 font-semibold">1 warning</span>
+                            <span class="text-green-400 font-semibold">3 passed</span>
+                        </div>
+                        <div class="text-slate-400 mt-2">Fix these issues before submitting to avoid rejection.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section id="how-it-works" class="py-24">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 scroll-reveal">
+                <h2 class="text-3xl sm:text-4xl font-bold mb-4">How it works</h2>
+                <p class="text-slate-400 text-lg">From push to peace of mind in seconds</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Step 1 -->
+                <div class="text-center scroll-reveal">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+                        1
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Connect your repo</h3>
+                    <p class="text-slate-400">Link your GitHub, GitLab, or Bitbucket repository. Takes 30 seconds.</p>
+                </div>
+                
+                <!-- Step 2 -->
+                <div class="text-center scroll-reveal">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+                        2
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Push your code</h3>
+                    <p class="text-slate-400">Every push triggers an automatic scan. No manual steps required.</p>
+                </div>
+                
+                <!-- Step 3 -->
+                <div class="text-center scroll-reveal">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl font-bold">
+                        3
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">Get instant feedback</h3>
+                    <p class="text-slate-400">See results in your PR, Slack, or dashboard. Fix issues before review.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="pricing" class="py-24 bg-slate-900/30">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 scroll-reveal">
+                <h2 class="text-3xl sm:text-4xl font-bold mb-4">Simple, honest pricing</h2>
+                <p class="text-slate-400 text-lg">Start free. Upgrade when you're ready.</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <!-- Starter Plan -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 card-hover scroll-reveal">
+                    <div class="text-lg font-medium text-slate-400 mb-2">Starter</div>
+                    <div class="flex items-baseline gap-1 mb-6">
+                        <span class="text-5xl font-bold">$9</span>
+                        <span class="text-slate-400">/month per repo</span>
+                    </div>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span class="text-slate-300">All 50+ checks</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span class="text-slate-300">Unlimited scans</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span class="text-slate-300">PR comments</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span class="text-slate-300">Email support</span>
+                        </li>
+                    </ul>
+                    <a href="#" class="block w-full text-center border border-slate-600 hover:border-slate-400 px-6 py-3 rounded-xl font-semibold transition-colors">
+                        Start Free Trial
+                    </a>
+                </div>
+                
+                <!-- Pro Plan -->
+                <div class="bg-gradient-to-br from-primary/20 to-accent/10 border border-primary/50 rounded-2xl p-8 relative card-hover scroll-reveal">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <span class="bg-primary px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
+                    </div>
+                    <div class="text-lg font-medium text-slate-400 mb-2">Pro</div>
+                    <div class="flex items-baseline gap-1 mb-6">
+                        <span class="text-5xl font-bold">$29</span>
+                        <span class="text-slate-400">/month</span>
+                    </div>
+                    <ul class="space-y-4 mb-8">
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span class="text-slate-300"><strong>Unlimited repos</strong></span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span class="text-slate-300">All 50+ checks</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span class="text-slate-300">Slack & webhook integrations</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span class="text-slate-300">Priority support</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span class="text-slate-300">Team dashboard</span>
+                        </li>
+                    </ul>
+                    <a href="#" class="block w-full text-center bg-primary hover:bg-indigo-600 px-6 py-3 rounded-xl font-semibold transition-colors">
+                        Start Free Trial
+                    </a>
+                </div>
+            </div>
+            
+            <p class="text-center text-slate-500 mt-8">
+                All plans include a 14-day free trial. No credit card required.
+            </p>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-24">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center scroll-reveal">
+            <h2 class="text-3xl sm:text-4xl font-bold mb-6">
+                Stop guessing. Start shipping.
+            </h2>
+            <p class="text-xl text-slate-400 mb-8 max-w-2xl mx-auto">
+                Join developers who catch rejection-causing issues before Apple does.
+            </p>
+            <a href="#pricing" class="inline-block bg-primary hover:bg-indigo-600 px-8 py-4 rounded-xl font-semibold text-lg transition-all pulse-glow">
+                Start Your Free Trial →
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 py-12">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="flex items-center gap-2">
+                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    <span class="font-bold">ReviewShield</span>
+                </div>
+                <div class="flex items-center gap-6 text-sm text-slate-500">
+                    <a href="#" class="hover:text-white transition-colors">Privacy</a>
+                    <a href="#" class="hover:text-white transition-colors">Terms</a>
+                    <a href="#" class="hover:text-white transition-colors">Contact</a>
+                    <a href="#" class="hover:text-white transition-colors">Twitter</a>
+                </div>
+                <div class="text-slate-500 text-sm">
+                    © 2026 ReviewShield. All rights reserved.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scroll Animation Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('revealed');
+                    }
+                });
+            }, {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            });
+
+            document.querySelectorAll('.scroll-reveal').forEach(el => {
+                observer.observe(el);
+            });
+        });
+    </script>
+</body>
+</html>
