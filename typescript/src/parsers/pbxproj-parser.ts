@@ -246,7 +246,7 @@ export function parseBuildConfigurations(content: string): Map<string, PbxprojBu
   let match;
   while ((match = configRegex.exec(content)) !== null) {
     const id = match[1];
-    const commentName = match[2].trim();
+    // match[2] is the comment name (unused)
     const settingsBlock = match[3];
     const name = match[4].trim();
     
@@ -409,23 +409,23 @@ export function normalizeXcodePath(
     const before = result;
     
     // Remove $(SRCROOT)/ or ${SRCROOT}/
-    result = result.replace(/\$[\({]SRCROOT[\)}]\/?/g, '');
+    result = result.replace(/\$[({]SRCROOT[)}]\/?/g, '');
     
     // Remove $(PROJECT_DIR)/ or ${PROJECT_DIR}/
-    result = result.replace(/\$[\({]PROJECT_DIR[\)}]\/?/g, '');
+    result = result.replace(/\$[({]PROJECT_DIR[)}]\/?/g, '');
     
     // Replace $(TARGET_NAME) or ${TARGET_NAME}
     if (context.targetName) {
-      result = result.replace(/\$[\({]TARGET_NAME[\)}]/g, context.targetName);
+      result = result.replace(/\$[({]TARGET_NAME[)}]/g, context.targetName);
     }
     
     // Replace $(PRODUCT_NAME) or ${PRODUCT_NAME}
     if (context.productName) {
-      result = result.replace(/\$[\({]PRODUCT_NAME[\)}]/g, context.productName);
+      result = result.replace(/\$[({]PRODUCT_NAME[)}]/g, context.productName);
     }
     
     // Replace $(inherited) - usually in arrays, remove it
-    result = result.replace(/\$[\({]inherited[\)}]/g, '');
+    result = result.replace(/\$[({]inherited[)}]/g, '');
     
     // If no changes were made, we're done
     if (result === before) {

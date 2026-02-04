@@ -1,7 +1,7 @@
 /**
  * Base utilities for rules
  */
-import type { Rule, Finding, Severity, Confidence, ScanContext } from '../types/index.js';
+import type { Rule, Finding, Severity, Confidence } from '../types/index.js';
 
 /**
  * Helper to create a finding with common rule properties

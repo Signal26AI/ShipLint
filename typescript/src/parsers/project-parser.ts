@@ -12,7 +12,7 @@ import * as path from 'path';
 import { parsePlist } from './plist-parser.js';
 import { parseEntitlements } from './entitlements-parser.js';
 import { parseProjectFrameworks, loadAllDependencies } from './framework-detector.js';
-import { getWorkspaceProjects, parseWorkspaceData } from './workspace-parser.js';
+import { getWorkspaceProjects } from './workspace-parser.js';
 import { getMainTargetArtifacts, normalizeXcodePath } from './pbxproj-parser.js';
 import type { Dependency, ScanContext } from '../types/index.js';
 
@@ -231,7 +231,7 @@ function parsePbxprojForArtifactsFallback(content: string, projectDir: string): 
   // Find INFOPLIST_FILE - may have quotes or not
   const infoPlistMatch = content.match(/INFOPLIST_FILE\s*=\s*"?([^";]+)"?\s*;/);
   if (infoPlistMatch) {
-    let plistPath = normalizeXcodePath(infoPlistMatch[1].trim());
+    const plistPath = normalizeXcodePath(infoPlistMatch[1].trim());
     const resolvedPath = path.resolve(projectDir, plistPath);
     if (fs.existsSync(resolvedPath)) {
       result.infoPlistPath = resolvedPath;
@@ -241,7 +241,7 @@ function parsePbxprojForArtifactsFallback(content: string, projectDir: string): 
   // Find CODE_SIGN_ENTITLEMENTS
   const entitlementsMatch = content.match(/CODE_SIGN_ENTITLEMENTS\s*=\s*"?([^";]+)"?\s*;/);
   if (entitlementsMatch) {
-    let entPath = normalizeXcodePath(entitlementsMatch[1].trim());
+    const entPath = normalizeXcodePath(entitlementsMatch[1].trim());
     const resolvedPath = path.resolve(projectDir, entPath);
     if (fs.existsSync(resolvedPath)) {
       result.entitlementsPath = resolvedPath;

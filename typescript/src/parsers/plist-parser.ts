@@ -2,7 +2,6 @@
  * Parser for Info.plist files
  */
 import * as fs from 'fs';
-import * as path from 'path';
 import plist from 'plist';
 import type { ParsedInfoPlist } from '../types/index.js';
 

@@ -140,7 +140,7 @@ The exception domains are ignored when NSAllowsArbitraryLoads is true.`,
         
         // Check if exception requires minimum TLS version
         const allowsInsecure = domainConfig['NSExceptionAllowsInsecureHTTPLoads'] as boolean;
-        const requiresCert = domainConfig['NSExceptionRequiresForwardSecrecy'] as boolean;
+        // NSExceptionRequiresForwardSecrecy available in domainConfig if needed
         const minTLS = domainConfig['NSExceptionMinimumTLSVersion'] as string;
         
         if (allowsInsecure === true && !minTLS) {

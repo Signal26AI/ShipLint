@@ -42,7 +42,6 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
   
   // Determine which rules to run
   let rules: Rule[];
-  const warnings: string[] = [];
   
   if (options.rules && options.rules.length > 0) {
     // BUG FIX #2: Validate rule IDs and error on unknown
