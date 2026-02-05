@@ -86,7 +86,7 @@ shiplint scan ./MyApp.xcodeproj
 
 ## What ShipLint Catches
 
-ShipLint ships with **10 rules** covering the most common App Store rejection reasons. Each rule maps directly to an Apple guideline and specific ITMS error code.
+ShipLint ships with **15 rules** covering the most common App Store rejection reasons. Each rule maps directly to an Apple guideline and specific ITMS error code.
 
 ### Privacy Usage Descriptions — [App Store Review Guideline 5.1.1](https://developer.apple.com/app-store/review/guidelines/#data-collection-and-storage)
 
