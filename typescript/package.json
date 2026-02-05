@@ -1,10 +1,10 @@
 {
-  "name": "reviewshield",
+  "name": "shiplint",
   "version": "0.1.0",
-  "description": "Catch App Store rejections before they happen. Scans iOS projects for Review Guideline violations.",
+  "description": "Catch App Store rejections before they happen. Pre-submission linter for iOS apps.",
   "main": "dist/index.js",
   "bin": {
-    "reviewshield": "./dist/cli/index.js"
+    "shiplint": "./dist/cli/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -33,10 +33,10 @@
   ],
   "author": "Signal26 <hello@signal26.dev>",
   "license": "UNLICENSED",
-  "homepage": "https://reviewshield.dev",
+  "homepage": "https://shiplint.app",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kazuochi/ReviewShield_iOS.git"
+    "url": "https://github.com/Signal26AI/ShipLint.git"
   },
   "bugs": {
     "url": "https://github.com/kazuochi/ReviewShield_iOS/issues"
