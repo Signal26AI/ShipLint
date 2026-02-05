@@ -1,5 +1,5 @@
 /**
- * ReviewShield - App Store Review Guideline Scanner
+ * ShipLint - App Store Pre-Submission Linter
  * 
  * Main library entry point for programmatic usage
  */

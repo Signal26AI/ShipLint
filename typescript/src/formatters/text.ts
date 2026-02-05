@@ -98,7 +98,7 @@ export async function formatText(result: ScanResult): Promise<string> {
   const lines: string[] = [];
   
   // Header
-  lines.push(c.bold.underline('\n🛡️  ReviewShield Scan Results\n'));
+  lines.push(c.bold.underline('\n🛡️  ShipLint Scan Results\n'));
   lines.push(`📁 Project: ${result.projectPath}`);
   lines.push(`🕐 Scanned: ${result.timestamp.toISOString()}`);
   lines.push(`⏱️  Duration: ${result.duration}ms`);

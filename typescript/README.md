@@ -1,19 +1,19 @@
-# ReviewShield
+# ShipLint
 
 🛡️ Catch App Store rejections before they happen.
 
-ReviewShield scans your iOS project for App Store Review Guideline violations and tells you exactly how to fix them.
+ShipLint scans your iOS project for App Store Review Guideline violations and tells you exactly how to fix them.
 
 ## Installation
 
 ```bash
-npm install -g reviewshield
+npm install -g shiplint
 ```
 
 Or with npx (no install required):
 
 ```bash
-npx reviewshield scan ./MyApp.xcodeproj
+npx shiplint scan ./MyApp.xcodeproj
 ```
 
 ## The Problem
@@ -27,12 +27,12 @@ Common culprits: missing privacy descriptions, Sign in with Apple requirements, 
 
 ## The Solution
 
-ReviewShield catches these issues **before** you submit:
+ShipLint catches these issues **before** you submit:
 
 ```bash
-$ reviewshield scan ./MyApp.xcodeproj
+$ shiplint scan ./MyApp.xcodeproj
 
-🛡️  ReviewShield Scan Results
+🛡️  ShipLint Scan Results
 
 🔍 Found 2 issue(s):
 
@@ -67,13 +67,13 @@ $ reviewshield scan ./MyApp.xcodeproj
 
 ```bash
 # Scan an Xcode project
-reviewshield scan ./MyApp.xcodeproj
+shiplint scan ./MyApp.xcodeproj
 
 # Scan a directory
-reviewshield scan ./ios
+shiplint scan ./ios
 
 # Output as JSON
-reviewshield scan ./MyApp.xcodeproj --format json
+shiplint scan ./MyApp.xcodeproj --format json
 ```
 
 ## Rules (10 and growing)
@@ -98,9 +98,9 @@ reviewshield scan ./MyApp.xcodeproj --format json
 
 ## Coming Soon
 
-**ReviewShield GitHub App** — automatic PR checks, no setup required.
+**ShipLint GitHub App** — automatic PR checks, no setup required.
 
-Join the waitlist: [reviewshield.dev](https://reviewshield.dev)
+Join the waitlist: [shiplint.dev](https://shiplint.dev)
 
 ---
 

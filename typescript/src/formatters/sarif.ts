@@ -102,9 +102,9 @@ export function formatSARIF(result: ScanResult): string {
       {
         tool: {
           driver: {
-            name: 'ReviewShield',
+            name: 'ShipLint',
             version: '0.1.0',
-            informationUri: 'https://github.com/kazuochi/ReviewShield_iOS',
+            informationUri: 'https://github.com/Signal26AI/ShipLint',
             rules: buildRules(result.findings),
           },
         },

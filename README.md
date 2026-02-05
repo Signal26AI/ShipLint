@@ -1,4 +1,4 @@
-# ReviewShield
+# ShipLint
 
 🛡️ Catch App Store rejections before they happen.
 
@@ -6,7 +6,7 @@
 
 ## About
 
-ReviewShield is a SaaS tool that scans iOS projects for App Store Review Guideline violations. It integrates with GitHub to automatically check PRs and block merges that would cause rejections.
+ShipLint is a SaaS tool that scans iOS projects for App Store Review Guideline violations. It integrates with GitHub to automatically check PRs and block merges that would cause rejections.
 
 ## Product
 

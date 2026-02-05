@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ReviewShield CLI
+ * ShipLint CLI
  * 
  * App Store Review Guideline scanner for iOS projects
  */
@@ -13,7 +13,7 @@ import { OutputFormat } from '../types/index.js';
 const program = new Command();
 
 program
-  .name('reviewshield')
+  .name('shiplint')
   .description('App Store Review Guideline scanner for iOS projects')
   .version('0.1.0');
 
@@ -74,7 +74,7 @@ program
       }));
       console.log(JSON.stringify(rules, null, 2));
     } else {
-      console.log('\n🛡️  ReviewShield Rules\n');
+      console.log('\n🛡️  ShipLint Rules\n');
       console.log('=' .repeat(60));
       
       for (const rule of allRules) {

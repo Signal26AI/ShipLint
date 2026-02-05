@@ -1,15 +1,15 @@
-# ReviewShield GitHub Action
+# ShipLint GitHub Action
 
 🛡️ **Scan iOS projects for App Store Review Guideline issues in CI/CD**
 
-ReviewShield catches common App Store rejection reasons before you submit, saving days of review cycles.
+ShipLint catches common App Store rejection reasons before you submit, saving days of review cycles.
 
 ## Quick Start
 
-Add to your workflow (`.github/workflows/reviewshield.yml`):
+Add to your workflow (`.github/workflows/shiplint.yml`):
 
 ```yaml
-name: ReviewShield
+name: ShipLint
 on: [pull_request]
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: reviewshield/action@v1
+      - uses: Signal26AI/ShipLint@v1
         with:
           path: '.'
 ```
@@ -44,7 +44,7 @@ jobs:
 
 ### 📝 Inline Annotations
 
-ReviewShield creates inline annotations on your PR, showing exactly where issues are:
+ShipLint creates inline annotations on your PR, showing exactly where issues are:
 
 - 🔴 **Error** - Critical/High severity (likely rejection)
 - 🟡 **Warning** - Medium severity (may cause rejection)
@@ -71,19 +71,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - uses: reviewshield/action@v1
+      - uses: Signal26AI/ShipLint@v1
         with:
           format: 'sarif'
           fail-on-error: 'false'
       
       - uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: reviewshield-results.sarif
+          sarif_file: shiplint-results.sarif
 ```
 
 ## Available Rules
 
-ReviewShield checks for common rejection reasons:
+ShipLint checks for common rejection reasons:
 
 | Rule ID | Description |
 |---------|-------------|
@@ -100,7 +100,7 @@ ReviewShield checks for common rejection reasons:
 ### Scan specific path
 
 ```yaml
-- uses: reviewshield/action@v1
+- uses: Signal26AI/ShipLint@v1
   with:
     path: 'ios/MyApp'
 ```
@@ -108,7 +108,7 @@ ReviewShield checks for common rejection reasons:
 ### Run specific rules only
 
 ```yaml
-- uses: reviewshield/action@v1
+- uses: Signal26AI/ShipLint@v1
   with:
     rules: 'missing-camera-purpose,missing-location-purpose'
 ```
@@ -116,7 +116,7 @@ ReviewShield checks for common rejection reasons:
 ### Exclude rules
 
 ```yaml
-- uses: reviewshield/action@v1
+- uses: Signal26AI/ShipLint@v1
   with:
     exclude: 'ats-exception-without-justification'
 ```
@@ -124,7 +124,7 @@ ReviewShield checks for common rejection reasons:
 ### Don't fail on issues (report only)
 
 ```yaml
-- uses: reviewshield/action@v1
+- uses: Signal26AI/ShipLint@v1
   with:
     fail-on-error: 'false'
 ```
@@ -139,19 +139,19 @@ jobs:
         project: [apps/ios, apps/watchos]
     steps:
       - uses: actions/checkout@v4
-      - uses: reviewshield/action@v1
+      - uses: Signal26AI/ShipLint@v1
         with:
           path: ${{ matrix.project }}
 ```
 
-## Why Use ReviewShield?
+## Why Use ShipLint?
 
 App Store rejections cost time:
 - 🕐 Average review time: 24-48 hours
 - 🔄 Multiple rounds for common issues
 - 😤 Frustrating for teams shipping fast
 
-ReviewShield catches issues **before** you submit:
+ShipLint catches issues **before** you submit:
 - ✅ Privacy permission descriptions
 - ✅ Sign in with Apple requirements  
 - ✅ Privacy manifest compliance
@@ -163,4 +163,4 @@ MIT
 
 ## Contributing
 
-Issues and PRs welcome at [ReviewShield](https://github.com/reviewshield/reviewshield)
+Issues and PRs welcome at [ShipLint](https://github.com/Signal26AI/ShipLint)

@@ -1,7 +1,7 @@
 {
-  "name": "@reviewshield/action",
+  "name": "@signal26ai/shiplint-action",
   "version": "0.1.0",
-  "description": "GitHub Action for ReviewShield - App Store Review Guideline scanner",
+  "description": "GitHub Action for ShipLint - App Store pre-submission linter",
   "main": "dist/index.js",
   "scripts": {
     "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
@@ -23,7 +23,7 @@
   "dependencies": {
     "@actions/core": "^1.10.1",
     "@actions/github": "^6.0.0",
-    "reviewshield": "file:../typescript"
+    "shiplint": "file:../typescript"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

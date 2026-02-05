@@ -1,5 +1,5 @@
 /**
- * TypeScript interfaces for ReviewShield
+ * TypeScript interfaces for ShipLint
  */
 
 /**
