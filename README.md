@@ -1,25 +1,43 @@
 # ShipLint
 
-🛡️ Catch App Store rejections before they happen.
+🛡️ **Pre-submission linter for iOS apps.** Catches App Store rejection reasons before you upload.
 
-**Status:** Private Beta
+[![npm version](https://img.shields.io/npm/v/shiplint.svg)](https://www.npmjs.com/package/shiplint)
 
-## About
+## What It Does
 
-ShipLint is a SaaS tool that scans iOS projects for App Store Review Guideline violations. It integrates with GitHub to automatically check PRs and block merges that would cause rejections.
+ShipLint scans your iOS project files — `Info.plist`, entitlements, `PrivacyInfo.xcprivacy`, and `project.pbxproj` — for issues that would trigger ITMS errors (ITMS-90683, ITMS-91053, ITMS-90078) or App Review violations. It runs in under 2 seconds, no Xcode required.
 
-## Product
+```bash
+npx shiplint scan ./YourApp
+```
 
-- **GitHub App** — Automatic PR checks
-- **CLI** — Local scanning for development
-- **Dashboard** — History, trends, team management
+**10 rules** covering privacy usage descriptions, App Tracking Transparency, Sign in with Apple, App Transport Security, and privacy manifests. Maps each issue to the specific [Apple guideline](https://developer.apple.com/app-store/review/guidelines/) and ITMS error code.
 
-## Tech Stack
+## Documentation
 
-- TypeScript / Node.js
-- GitHub App (Probot)
-- Vercel (hosting)
+📖 **Full documentation, rules reference, CI/CD setup, and FAQ:** [`typescript/README.md`](./typescript/README.md)
+
+## Repository Structure
+
+```
+├── typescript/          # ShipLint CLI & scanning engine (npm package)
+│   ├── src/
+│   │   ├── rules/       # Rule definitions (privacy, auth, metadata, config)
+│   │   ├── cli/         # CLI entry point
+│   │   └── ...
+│   ├── README.md        # ← Full documentation lives here
+│   └── package.json
+└── README.md            # This file (overview)
+```
+
+## Quick Links
+
+- 🌐 [shiplint.app](https://shiplint.app)
+- 📦 [npm: shiplint](https://www.npmjs.com/package/shiplint)
+- 💻 [GitHub: Signal26AI/ShipLint](https://github.com/Signal26AI/ShipLint)
+- 🐛 [Issues](https://github.com/Signal26AI/ShipLint/issues)
 
 ---
 
-© 2026 Signal26. All rights reserved.
+© 2025–2026 [Signal26](https://signal26.dev). All rights reserved.
