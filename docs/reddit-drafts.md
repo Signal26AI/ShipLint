@@ -33,11 +33,11 @@ Detailed breakdown: [shiplint.app/errors/itms-91053.html](https://shiplint.app/e
 
 ---
 
-**ITMS-90078: Missing App Icon**
+**ITMS-90078: Missing Export Compliance**
 
-Sounds obvious, but this trips up automated builds and CI pipelines constantly. You need a 1024x1024 App Store icon in your asset catalog — the regular app icons aren't enough.
+Every upload, App Store Connect asks "Does your app use encryption?" If you don't declare `ITSAppUsesNonExemptEncryption` in your Info.plist, you get prompted manually every single time. Most apps only use HTTPS (which is exempt), so the fix is simple.
 
-The fix: Add `AppIcon` to Assets.xcassets with the marketing icon slot filled.
+The fix: Add `<key>ITSAppUsesNonExemptEncryption</key><false/>` to Info.plist if you only use standard HTTPS.
 
 Detailed breakdown: [shiplint.app/errors/itms-90078.html](https://shiplint.app/errors/itms-90078.html)
 
