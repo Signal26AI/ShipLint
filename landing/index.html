@@ -103,28 +103,23 @@
             theme: {
                 extend: {
                     colors: {
-                        // Ship Brand System v1.0
                         surface: {
-                            900: '#0A0A0B',  // bg-base
-                            800: '#111113',  // bg-elevated
-                            700: '#18181B',  // bg-subtle
-                            600: '#27272A',  // bg-muted (borders)
-                            500: '#3F3F46',
+                            900: '#0d0d0f',
+                            800: '#141418',
+                            700: '#1c1c22',
+                            600: '#26262e',
+                            500: '#32323c',
                         },
                         accent: {
-                            DEFAULT: '#10B981',  // Ship Green (primary)
-                            light: '#34D399',    // green-400 (hover)
-                            dim: '#059669',      // green-600 (active)
+                            DEFAULT: '#10b981',
+                            light: '#34d399',
+                            dim: '#065f46',
                         },
-                        // Text colors from brand system
-                        'text-primary': '#FAFAFA',
-                        'text-secondary': '#A1A1AA',
-                        'text-muted': '#71717A',
-                        muted: '#A1A1AA',
+                        muted: '#9ca3af',
                     },
                     fontFamily: {
-                        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'SF Mono', 'Menlo', 'Consolas', 'Liberation Mono', 'monospace'],
-                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+                        mono: ['ui-monospace', 'SFMono-Regular', 'SF Mono', 'Menlo', 'Consolas', 'Liberation Mono', 'monospace'],
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
                     }
                 }
             }
@@ -212,7 +207,7 @@
         }
     </style>
 </head>
-<body class="bg-[#0A0A0B] text-[#FAFAFA] antialiased font-sans">
+<body class="bg-surface-900 text-gray-100 antialiased font-sans">
     <!-- Skip link for accessibility -->
     <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-accent text-black px-4 py-2 rounded-lg font-medium z-50">
         Skip to main content
@@ -226,7 +221,7 @@
                     <svg class="w-7 h-7 text-accent group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span><span class="text-accent">Ship</span><span class="text-[#FAFAFA]">Lint</span></span>
+                    <span>ShipLint</span>
                 </a>
                 <div class="flex items-center gap-6">
                     <a href="#what-it-catches" class="text-muted hover:text-white transition-colors hidden sm:block text-sm">Rules</a>
@@ -852,8 +847,7 @@
                     </div>
                     <a
                         href="https://github.com/Signal26AI/ShipLint"
-                        class="flex items-center justify-center gap-2 bg-accent hover:bg-accent-light active:bg-accent-dim text-white font-medium px-6 py-3 rounded-lg transition-all hover:-translate-y-0.5"
-                        style="min-height: 48px;"
+                        class="flex items-center justify-center gap-2 bg-accent hover:bg-accent-light text-black font-semibold px-6 py-3.5 rounded-lg transition-colors"
                         target="_blank"
                         rel="noopener noreferrer"
                     >
@@ -877,7 +871,7 @@
                     <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span class="font-semibold"><span class="text-accent">Ship</span><span class="text-[#FAFAFA]">Lint</span></span>
+                    <span class="font-semibold text-white">ShipLint</span>
                     <span class="text-surface-500">·</span>
                     <span class="text-sm">Built by <a href="https://signal26.ai" class="text-accent hover:text-accent-light transition-colors" target="_blank" rel="noopener noreferrer">Signal26</a></span>
                 </div>
