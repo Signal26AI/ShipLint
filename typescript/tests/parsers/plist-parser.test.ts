@@ -70,6 +70,7 @@ describe('isPlaceholder', () => {
   it('should detect very short strings', () => {
     expect(isPlaceholder('test')).toBe(true);
     expect(isPlaceholder('abc')).toBe(true);
+    expect(isPlaceholder('Camera access ok')).toBe(true);
   });
 
   it('should detect common placeholders', () => {
@@ -78,11 +79,13 @@ describe('isPlaceholder', () => {
     expect(isPlaceholder('FIXME: need real description')).toBe(true);
     expect(isPlaceholder('Placeholder text here')).toBe(true);
     expect(isPlaceholder('Your app needs camera access')).toBe(true);
+    expect(isPlaceholder('This app needs camera access')).toBe(true);
     expect(isPlaceholder('testing camera access')).toBe(true);
   });
 
   it('should accept valid descriptions', () => {
     expect(isPlaceholder('We need camera access to take photos for your profile')).toBe(false);
+    expect(isPlaceholder('This app uses the camera to scan QR codes.')).toBe(false);
     expect(isPlaceholder('Location is used to show nearby restaurants and provide directions')).toBe(false);
   });
 });

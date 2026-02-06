@@ -108,26 +108,40 @@ export const knownUsageDescriptionKeys: Record<string, string[]> = {
 export function isPlaceholder(value: string): boolean {
   const lowercased = value.toLowerCase().trim();
   
-  // Empty or very short
-  if (lowercased.length < 10) {
+  // Empty or very short (less than 20 chars is too generic)
+  if (lowercased.length < 20) {
     return true;
   }
   
-  // Common placeholder patterns
-  const placeholders = [
+  // Obvious placeholder patterns - always flag these
+  const obviousPlaceholders = [
     'lorem ipsum',
     'todo',
     'fixme',
     'placeholder',
     'description here',
     'add description',
-    'your app',
-    'this app',
-    'test',
-    'testing',
     'xxx',
     '...',
   ];
   
-  return placeholders.some(p => lowercased.includes(p));
+  if (obviousPlaceholders.some(p => lowercased.includes(p))) {
+    return true;
+  }
+  
+  // Generic patterns that need context check
+  // "This app needs camera" = bad, "This app uses the camera to scan QR codes" = good
+  const genericStarters = ['your app', 'this app', 'testing', 'test '];
+  const hasGenericStarter = genericStarters.some(p => lowercased.includes(p));
+  
+  if (hasGenericStarter) {
+    // If it's short or doesn't explain WHY, it's a placeholder
+    // Good descriptions usually have 40+ chars and explain the purpose
+    const explainsPurpose = lowercased.length >= 40 && 
+      (lowercased.includes(' to ') || lowercased.includes(' for ') || 
+       lowercased.includes(' so ') || lowercased.includes(' in order to'));
+    return !explainsPurpose;
+  }
+  
+  return false;
 }

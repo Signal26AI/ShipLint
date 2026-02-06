@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import * as path from 'path';
 import * as fs from 'fs';
-import { scan, format, OutputFormat, Severity, type Finding, type ScanResult } from 'reviewshield';
+import { scan, format, OutputFormat, Severity, type Finding, type ScanResult } from 'shiplint';
 
 /**
  * Severity mapping for GitHub annotations
@@ -36,7 +36,7 @@ function createAnnotations(findings: Finding[], basePath: string): void {
     ].filter(Boolean).join('\n');
     
     const properties: core.AnnotationProperties = {
-      title: `ReviewShield: ${finding.ruleId}`,
+      title: `ShipLint: ${finding.ruleId}`,
       file,
     };
     
@@ -83,7 +83,7 @@ async function run(): Promise<void> {
     const rules = rulesInput ? rulesInput.split(',').map(r => r.trim()).filter(Boolean) : undefined;
     const exclude = excludeInput ? excludeInput.split(',').map(r => r.trim()).filter(Boolean) : undefined;
     
-    core.info(`🛡️ ReviewShield - Scanning for App Store Review issues`);
+    core.info(`🛡️ ShipLint - Scanning for App Store Review issues`);
     core.info(`📁 Path: ${absolutePath}`);
     if (rules?.length) {
       core.info(`🎯 Rules: ${rules.join(', ')}`);
@@ -110,17 +110,17 @@ async function run(): Promise<void> {
     
     // Handle output format
     if (outputFormat === 'sarif') {
-      const sarifPath = path.join(workspacePath, 'reviewshield-results.sarif');
+      const sarifPath = path.join(workspacePath, 'shiplint-results.sarif');
       await writeSarifOutput(result, sarifPath);
       core.setOutput('sarif-file', sarifPath);
       core.info(`📄 SARIF output written to: ${sarifPath}`);
       
       // Log instructions for GitHub Security tab
       core.info('');
-      core.info('💡 To see results in the Security tab, add this step after ReviewShield:');
+      core.info('💡 To see results in the Security tab, add this step after ShipLint:');
       core.info('   - uses: github/codeql-action/upload-sarif@v3');
       core.info('     with:');
-      core.info('       sarif_file: reviewshield-results.sarif');
+      core.info('       sarif_file: shiplint-results.sarif');
     } else {
       // Print formatted output
       const formatType = outputFormat === 'json' ? OutputFormat.JSON : OutputFormat.Text;
@@ -149,7 +149,7 @@ async function run(): Promise<void> {
       
       // Create job summary
       await core.summary
-        .addHeading('ReviewShield Scan Results', 2)
+        .addHeading('ShipLint Scan Results', 2)
         .addTable([
           [{ data: 'Severity', header: true }, { data: 'Count', header: true }],
           ['🔴 Critical', String(byLevel.critical)],
@@ -165,15 +165,15 @@ async function run(): Promise<void> {
         .write();
       
       if (failOnError) {
-        core.setFailed(`ReviewShield found ${result.findings.length} issue(s)`);
+        core.setFailed(`ShipLint found ${result.findings.length} issue(s)`);
       }
     }
     
   } catch (error) {
     if (error instanceof Error) {
-      core.setFailed(`ReviewShield failed: ${error.message}`);
+      core.setFailed(`ShipLint failed: ${error.message}`);
     } else {
-      core.setFailed('ReviewShield failed with an unknown error');
+      core.setFailed('ShipLint failed with an unknown error');
     }
   }
 }

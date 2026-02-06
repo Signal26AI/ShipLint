@@ -1,6 +1,6 @@
-name: 'ReviewShield'
+name: 'ShipLint'
 description: 'Scan iOS projects for App Store Review Guideline issues before submission'
-author: 'ReviewShield'
+author: 'ShipLint'
 
 branding:
   icon: 'shield'
