@@ -9,6 +9,7 @@ import { scan } from '../core/scanner.js';
 import { format } from '../formatters/index.js';
 import { allRules } from '../rules/index.js';
 import { OutputFormat } from '../types/index.js';
+import { startMcpServer } from '../mcp/server.js';
 import packageJson from '../../package.json';
 
 const program = new Command();
@@ -87,6 +88,22 @@ program
         console.log(`  Description: ${rule.description}`);
       }
       console.log('\n');
+    }
+  });
+
+program
+  .command('mcp')
+  .description('Start MCP (Model Context Protocol) server for AI agent integration')
+  .action(async () => {
+    try {
+      await startMcpServer();
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(`Error: ${error.message}`);
+      } else {
+        console.error('An unknown error occurred');
+      }
+      process.exit(1);
     }
   });
 
