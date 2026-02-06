@@ -49,7 +49,7 @@ export const LocationAlwaysUnjustifiedRule: Rule = {
           `but UIBackgroundModes does not include "location". This configuration strongly suggests ` +
           `your app doesn't have a legitimate continuous location feature, which Apple will ` +
           `likely question during review.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `You have two options:
 
 **Option 1: If you DO need Always permission (navigation, fitness, geofencing):**
@@ -96,7 +96,7 @@ Note: Always permission is heavily scrutinized. Be prepared to justify your use 
             description: `Your Always location description doesn't clearly explain a continuous ` +
               `location feature: "${alwaysDesc}". Apple expects clear justification for ` +
               `Always permission.`,
-            location: 'Info.plist',
+            location: context.infoPlistPath || 'Info.plist',
             fixGuidance: `Update your description to clearly explain the continuous location feature:
 
 Good examples:

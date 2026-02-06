@@ -55,7 +55,7 @@ export const MissingMicrophonePurposeRule: Rule = {
           description: `Your app links against the Speech framework but Info.plist is missing ` +
             `NSSpeechRecognitionUsageDescription. Apps using speech recognition must provide a ` +
             `purpose string explaining why access is needed.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Add NSSpeechRecognitionUsageDescription to your Info.plist:
 
 <key>NSSpeechRecognitionUsageDescription</key>
@@ -68,7 +68,7 @@ Note: You'll also need NSMicrophoneUsageDescription since speech recognition req
         findings.push(makeFinding(this, {
           title: 'Empty Speech Recognition Usage Description',
           description: `NSSpeechRecognitionUsageDescription exists but is empty.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Provide a meaningful description for speech recognition usage.`,
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsspeechrecognitionusagedescription',
         }));
@@ -76,7 +76,7 @@ Note: You'll also need NSMicrophoneUsageDescription since speech recognition req
         findings.push(makeFinding(this, {
           title: 'Placeholder Speech Recognition Usage Description',
           description: `NSSpeechRecognitionUsageDescription contains placeholder text: "${speechDescription}".`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Replace the placeholder with a real description of your speech recognition feature.`,
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsspeechrecognitionusagedescription',
         }));
@@ -98,7 +98,7 @@ Note: You'll also need NSMicrophoneUsageDescription since speech recognition req
         description: `Your app links against audio frameworks (${frameworksToReport.join(', ')}) ` +
           `but Info.plist is missing NSMicrophoneUsageDescription. Apps that access the microphone ` +
           `must provide a purpose string explaining why access is needed.${avFoundationCaveat}`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Add NSMicrophoneUsageDescription to your Info.plist with a clear, user-facing explanation ` +
           `of why your app needs microphone access. For example:
 
@@ -115,7 +115,7 @@ The description should explain the specific feature that uses the microphone.`,
         title: 'Empty Microphone Usage Description',
         description: `NSMicrophoneUsageDescription exists in Info.plist but is empty. ` +
           `Apple requires a meaningful description explaining why your app needs microphone access.${avFoundationCaveat}`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Update NSMicrophoneUsageDescription with a clear, specific explanation of why your app ` +
           `needs microphone access. Generic or empty descriptions will be rejected.
 
@@ -130,7 +130,7 @@ Bad example: "Microphone access required" or ""`,
         title: 'Placeholder Microphone Usage Description',
         description: `NSMicrophoneUsageDescription appears to contain placeholder text: "${microphoneDescription}". ` +
           `Apple requires meaningful, user-facing descriptions.${avFoundationCaveat}`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Replace the placeholder text with a clear explanation of why your app needs microphone access. ` +
           `The description should be specific to your app's features.
 

@@ -32,7 +32,7 @@ export const MissingLaunchStoryboardRule: Rule = {
         description: `Your Info.plist is missing the UILaunchStoryboardName key. Since April 2020, ` +
           `all apps submitted to the App Store must include a launch storyboard to support ` +
           `all device screen sizes. Apps without a launch storyboard will be rejected.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Add UILaunchStoryboardName to your Info.plist pointing to your launch storyboard:
 
 <key>UILaunchStoryboardName</key>

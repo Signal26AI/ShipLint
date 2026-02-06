@@ -40,7 +40,7 @@ export const MissingContactsPurposeRule: Rule = {
           description: `Your app links against contacts frameworks (${detectedFrameworks.join(', ')}) ` +
             `but Info.plist is missing NSContactsUsageDescription. Apps that access the user's contacts ` +
             `must provide a purpose string explaining why access is needed.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Add NSContactsUsageDescription to your Info.plist with a clear, user-facing explanation ` +
             `of why your app needs contacts access. For example:
 
@@ -61,7 +61,7 @@ contacts access, so ensure you have a legitimate user-facing feature that requir
           title: 'Empty Contacts Usage Description',
           description: `NSContactsUsageDescription exists in Info.plist but is empty. ` +
             `Apple requires a meaningful description explaining why your app needs contacts access.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Update NSContactsUsageDescription with a clear, specific explanation of why your app ` +
             `needs contacts access. Generic or empty descriptions will be rejected.
 
@@ -81,7 +81,7 @@ Note: Contacts are sensitive data. Only request access if you have a clear user-
           title: 'Placeholder Contacts Usage Description',
           description: `NSContactsUsageDescription appears to contain placeholder text: "${contactsDescription}". ` +
             `Apple requires meaningful, user-facing descriptions.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Replace the placeholder text with a clear explanation of why your app needs contacts access. ` +
             `The description should be specific to your app's features.
 

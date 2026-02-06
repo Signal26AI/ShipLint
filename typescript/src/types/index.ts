@@ -100,7 +100,9 @@ export interface ParsedInfoPlist {
 export interface ScanContext {
   projectPath: string;
   infoPlist: Record<string, unknown>;
+  infoPlistPath?: string;
   entitlements: Record<string, unknown>;
+  entitlementsPath?: string;
   linkedFrameworks: Set<string>;
   dependencies: Dependency[];
   

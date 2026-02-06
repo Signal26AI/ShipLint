@@ -42,7 +42,7 @@ export const MissingPhotoLibraryPurposeRule: Rule = {
         description: `Your app links against photo library frameworks (${detectedFrameworks.join(', ')}) ` +
           `but Info.plist is missing NSPhotoLibraryUsageDescription. Apps that access the photo library ` +
           `must provide a purpose string explaining why access is needed.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Add NSPhotoLibraryUsageDescription to your Info.plist with a clear, user-facing explanation ` +
           `of why your app needs photo library access. For example:
 
@@ -59,7 +59,7 @@ If your app only needs to save photos (not read), you can use NSPhotoLibraryAddU
         title: 'Empty Photo Library Usage Description',
         description: `NSPhotoLibraryUsageDescription exists in Info.plist but is empty. ` +
           `Apple requires a meaningful description explaining why your app needs photo library access.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Update NSPhotoLibraryUsageDescription with a clear, specific explanation of why your app ` +
           `needs photo library access. Generic or empty descriptions will be rejected.
 
@@ -74,7 +74,7 @@ Bad example: "Photo access required" or ""`,
         title: 'Placeholder Photo Library Usage Description',
         description: `NSPhotoLibraryUsageDescription appears to contain placeholder text: "${photoLibraryDescription}". ` +
           `Apple requires meaningful, user-facing descriptions.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Replace the placeholder text with a clear explanation of why your app needs photo library access. ` +
           `The description should be specific to your app's features.
 
@@ -92,7 +92,7 @@ Write a description that helps users understand what feature uses the photo libr
           title: 'Empty Photo Library Add Usage Description',
           description: `NSPhotoLibraryAddUsageDescription exists in Info.plist but is empty. ` +
             `Apple requires a meaningful description explaining why your app needs to save photos.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Update NSPhotoLibraryAddUsageDescription with a clear explanation of why your app needs to save photos.
 
 Good example: "Save edited photos to your library."`,
@@ -102,7 +102,7 @@ Good example: "Save edited photos to your library."`,
         findings.push(makeFinding(this, {
           title: 'Placeholder Photo Library Add Usage Description',
           description: `NSPhotoLibraryAddUsageDescription contains placeholder text: "${photoLibraryAddDescription}".`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Replace the placeholder with a real description of why your app needs to save photos.`,
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsphotolibraryaddusagedescription',
         }));

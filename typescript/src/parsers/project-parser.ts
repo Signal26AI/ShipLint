@@ -644,7 +644,9 @@ export function createScanContext(discovery: ProjectDiscovery): ScanContext {
     infoPlist,
     entitlements,
     linkedFrameworks,
-    dependencies
+    dependencies,
+    discovery.infoPlistPath,
+    discovery.entitlementsPath
   );
 }
 
@@ -656,12 +658,16 @@ export function createContextObject(
   infoPlist: Record<string, unknown>,
   entitlements: Record<string, unknown>,
   linkedFrameworks: Set<string>,
-  dependencies: Dependency[]
+  dependencies: Dependency[],
+  infoPlistPath?: string,
+  entitlementsPath?: string
 ): ScanContext {
   return {
     projectPath,
     infoPlist,
+    infoPlistPath,
     entitlements,
+    entitlementsPath,
     linkedFrameworks,
     dependencies,
     

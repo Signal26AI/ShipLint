@@ -46,7 +46,7 @@ export const MissingLocationPurposeRule: Rule = {
         description: `Your app links against location-related frameworks (${detectedFrameworks.join(', ')}) ` +
           `but Info.plist is missing NSLocationWhenInUseUsageDescription. Apps that access location services ` +
           `must provide a purpose string explaining why access is needed.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Add NSLocationWhenInUseUsageDescription to your Info.plist with a clear, user-facing explanation ` +
           `of why your app needs location access. For example:
 
@@ -64,7 +64,7 @@ This key is required for any location access. The description should explain the
         title: 'Empty Location Usage Description',
         description: `NSLocationWhenInUseUsageDescription exists in Info.plist but is empty. ` +
           `Apple requires a meaningful description explaining why your app needs location access.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Update NSLocationWhenInUseUsageDescription with a clear, specific explanation of why your app ` +
           `needs location access. Generic or empty descriptions will be rejected.
 
@@ -79,7 +79,7 @@ Bad example: "Location access required" or ""`,
         title: 'Placeholder Location Usage Description',
         description: `NSLocationWhenInUseUsageDescription appears to contain placeholder text: "${whenInUseDescription}". ` +
           `Apple requires meaningful, user-facing descriptions.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Replace the placeholder text with a clear explanation of why your app needs location access. ` +
           `The description should be specific to your app's features.
 
@@ -103,7 +103,7 @@ Write a description that helps users understand what feature uses location and w
             description: `Your app has NSLocationAlwaysUsageDescription but is missing ` +
               `NSLocationAlwaysAndWhenInUseUsageDescription. Since iOS 11, both keys are required ` +
               `when requesting Always location permission.`,
-            location: 'Info.plist',
+            location: context.infoPlistPath || 'Info.plist',
             fixGuidance: `Add NSLocationAlwaysAndWhenInUseUsageDescription to your Info.plist. This key is required ` +
               `for iOS 11+ when requesting Always permission.
 
@@ -125,7 +125,7 @@ Note: Always permission is heavily scrutinized. Only request it if you have a vi
           title: 'Empty Always Location Description',
           description: `NSLocationAlwaysAndWhenInUseUsageDescription exists but is empty. ` +
             `Apple requires a meaningful description for Always location access.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Provide a clear explanation of why your app needs Always location access. ` +
             `This should describe a user-facing feature that requires continuous location.
 
@@ -140,7 +140,7 @@ Example: "Track your runs in the background so you can see your route even ` +
           title: 'Placeholder Always Location Description',
           description: `NSLocationAlwaysAndWhenInUseUsageDescription contains placeholder text: ` +
             `"${alwaysAndWhenInUseDescription}".`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Replace the placeholder with a real description of your continuous location feature. ` +
             `Always permission requires a clear, user-visible justification.`,
           documentationURL: 'https://developer.apple.com/documentation/corelocation/choosing_the_location_services_authorization_to_request',

@@ -31,7 +31,7 @@ export const MissingSupportedOrientationsRule: Rule = {
             `Apps should declare which interface orientations they support to ensure correct ` +
             `behavior across all device types. Without this key, Apple's defaults may not match ` +
             `your app's intended behavior, which can lead to UI issues and potential rejection.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Add UISupportedInterfaceOrientations to your Info.plist with the orientations ` +
             `your app supports:
 
@@ -60,7 +60,7 @@ For iPad, also consider adding UISupportedInterfaceOrientations~ipad with ` +
           title: 'Empty Supported Orientations',
           description: `UISupportedInterfaceOrientations exists in Info.plist but is an empty array. ` +
             `Your app must declare at least one supported orientation.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Add at least one orientation to UISupportedInterfaceOrientations:
 
 <key>UISupportedInterfaceOrientations</key>

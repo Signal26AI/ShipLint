@@ -32,7 +32,7 @@ export const MissingEncryptionFlagRule: Rule = {
           `Without this key, App Store Connect will prompt you to answer export compliance ` +
           `questions manually on every single upload. This causes friction and potential delays ` +
           `in your submission workflow.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Add the ITSAppUsesNonExemptEncryption key to your Info.plist. If your app ` +
           `only uses HTTPS/URLSession or standard iOS encryption (most apps), set it to false:
 

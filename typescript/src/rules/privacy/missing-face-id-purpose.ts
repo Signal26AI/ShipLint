@@ -38,7 +38,7 @@ export const MissingFaceIdPurposeRule: Rule = {
           description: `Your app links against biometric authentication frameworks (${detectedFrameworks.join(', ')}) ` +
             `but Info.plist is missing NSFaceIDUsageDescription. Apps that use Face ID ` +
             `must provide a purpose string explaining why biometric authentication is needed.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Add NSFaceIDUsageDescription to your Info.plist with a clear, user-facing ` +
             `explanation of why your app needs Face ID access. For example:
 
@@ -59,7 +59,7 @@ The description should explain what feature uses Face ID and ` +
           title: 'Empty Face ID Usage Description',
           description: `NSFaceIDUsageDescription exists in Info.plist but is empty. ` +
             `Apple requires a meaningful description explaining why your app needs Face ID access.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Update NSFaceIDUsageDescription with a clear, specific explanation of why ` +
             `your app needs Face ID access. Generic or empty descriptions may be rejected.
 
@@ -77,7 +77,7 @@ Bad example: "Face ID access required" or ""`,
           title: 'Placeholder Face ID Usage Description',
           description: `NSFaceIDUsageDescription appears to contain placeholder text: "${faceIdDescription}". ` +
             `Apple requires meaningful, user-facing descriptions.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Replace the placeholder text with a clear explanation of why your app needs Face ID access. ` +
             `The description should be specific to your app's features.
 

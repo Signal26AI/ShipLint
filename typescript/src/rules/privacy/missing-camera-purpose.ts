@@ -44,7 +44,7 @@ export const MissingCameraPurposeRule: Rule = {
           description: `Your app links against camera-related frameworks (${detectedFrameworks.join(', ')}) ` +
             `but Info.plist is missing NSCameraUsageDescription. Apps that access the camera must ` +
             `provide a purpose string explaining why access is needed.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Add NSCameraUsageDescription to your Info.plist with a clear, user-facing explanation ` +
             `of why your app needs camera access. For example:
 
@@ -65,7 +65,7 @@ The description should explain the specific feature that uses the camera and ` +
           title: 'Empty Camera Usage Description',
           description: `NSCameraUsageDescription exists in Info.plist but is empty. ` +
             `Apple requires a meaningful description explaining why your app needs camera access.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Update NSCameraUsageDescription with a clear, specific explanation of why your app ` +
             `needs camera access. Generic or empty descriptions may be rejected.
 
@@ -83,7 +83,7 @@ Bad example: "Camera access required" or ""`,
           title: 'Placeholder Camera Usage Description',
           description: `NSCameraUsageDescription appears to contain placeholder text: "${cameraDescription}". ` +
             `Apple requires meaningful, user-facing descriptions.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Replace the placeholder text with a clear explanation of why your app needs camera access. ` +
             `The description should be specific to your app's features.
 

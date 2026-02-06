@@ -38,7 +38,7 @@ export const MissingBluetoothPurposeRule: Rule = {
           description: `Your app links against Bluetooth frameworks (${detectedFrameworks.join(', ')}) ` +
             `but Info.plist is missing NSBluetoothAlwaysUsageDescription. Apps that access Bluetooth ` +
             `must provide a purpose string explaining why access is needed.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Add NSBluetoothAlwaysUsageDescription to your Info.plist with a clear, user-facing ` +
             `explanation of why your app needs Bluetooth access. For example:
 
@@ -59,7 +59,7 @@ The description should explain the specific feature that uses Bluetooth and ` +
           title: 'Empty Bluetooth Usage Description',
           description: `NSBluetoothAlwaysUsageDescription exists in Info.plist but is empty. ` +
             `Apple requires a meaningful description explaining why your app needs Bluetooth access.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Update NSBluetoothAlwaysUsageDescription with a clear, specific explanation of why ` +
             `your app needs Bluetooth access. Generic or empty descriptions may be rejected.
 
@@ -77,7 +77,7 @@ Bad example: "Bluetooth access required" or ""`,
           title: 'Placeholder Bluetooth Usage Description',
           description: `NSBluetoothAlwaysUsageDescription appears to contain placeholder text: "${bluetoothDescription}". ` +
             `Apple requires meaningful, user-facing descriptions.`,
-          location: 'Info.plist',
+          location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Replace the placeholder text with a clear explanation of why your app needs Bluetooth access. ` +
             `The description should be specific to your app's features.
 

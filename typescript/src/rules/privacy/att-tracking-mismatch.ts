@@ -45,7 +45,7 @@ export const ATTTrackingMismatchRule: Rule = {
         description: `Your app includes tracking/attribution SDKs (${detectedSDKs.join(', ')}) ` +
           `but Info.plist is missing NSUserTrackingUsageDescription. Since iOS 14.5, apps that track ` +
           `users must implement App Tracking Transparency and include a purpose string.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Add NSUserTrackingUsageDescription to your Info.plist:
 
 <key>NSUserTrackingUsageDescription</key>
@@ -74,7 +74,7 @@ Important: Only initialize tracking SDKs after the user grants permission.`,
         title: 'Empty Tracking Usage Description',
         description: `NSUserTrackingUsageDescription exists but is empty. Apple requires a meaningful ` +
           `description explaining why your app tracks users.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Update NSUserTrackingUsageDescription with a clear explanation of your tracking purpose.
 
 Good example: "Allow tracking to receive personalized ads based on your interests."
@@ -90,7 +90,7 @@ Be specific about what data is collected and how it's used.`,
         title: 'Placeholder Tracking Usage Description',
         description: `NSUserTrackingUsageDescription appears to contain placeholder text: "${trackingDescription}". ` +
           `Apple requires meaningful, user-facing descriptions.`,
-        location: 'Info.plist',
+        location: context.infoPlistPath || 'Info.plist',
         fixGuidance: `Replace the placeholder with a real explanation of why your app tracks users.
 
 Current value: "${trackingDescription}"

@@ -58,7 +58,7 @@ export const ThirdPartyLoginNoSIWARule: Rule = {
             `but the Sign in with Apple capability is not configured. According to App Store Review ` +
             `Guideline 4.8, apps that offer third-party social login must also offer Sign in with Apple ` +
             `as an equivalent option.`,
-          location: 'Entitlements',
+          location: context.entitlementsPath || 'Entitlements',
           fixGuidance: `Add Sign in with Apple to your app:
 
 1. In Xcode, select your app target → Signing & Capabilities
@@ -115,7 +115,7 @@ Note: If you're using a third-party library that wraps SIWA, you can ignore ` +
         description: `Your app includes authentication SDKs (${ambiguousSDKs.join(', ')}) that may ` +
           `be configured for social login. If you offer Google, Facebook, or other social login ` +
           `options, you must also offer Sign in with Apple.`,
-        location: 'Entitlements',
+        location: context.entitlementsPath || 'Entitlements',
         fixGuidance: `Review your authentication implementation:
 
 **If you use social login (Google, Facebook, etc.):**
