@@ -1,0 +1,16 @@
+# ShipLint Analytics Worker
+name = "shiplint-analytics"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Custom route (add after Cloudflare setup)
+# routes = [
+#   { pattern = "shiplint.app/api/*", zone_name = "shiplint.app" },
+#   { pattern = "shiplint.app/stats", zone_name = "shiplint.app" }
+# ]
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "shiplint-analytics"
+database_id = "YOUR_DATABASE_ID"  # Replace after: wrangler d1 create shiplint-analytics

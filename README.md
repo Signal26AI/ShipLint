@@ -13,32 +13,78 @@ ShipLint scans your iOS project files — `Info.plist`, entitlements, `PrivacyIn
 npx shiplint scan ./YourApp
 ```
 
-**15 rules** covering privacy usage descriptions, App Tracking Transparency, Sign in with Apple, App Transport Security, privacy manifests, export compliance, and launch configuration. Maps each issue to the specific [Apple guideline](https://developer.apple.com/app-store/review/guidelines/) and ITMS error code.
+**15 rules** covering privacy usage descriptions, App Tracking Transparency, Sign in with Apple, App Transport Security, privacy manifests, export compliance, and launch configuration.
+
+## Quick Start
+
+```bash
+# Run directly (no install)
+npx shiplint scan ./MyApp
+
+# Or install globally
+npm install -g shiplint
+shiplint scan ./MyApp
+
+# Use with AI agents (MCP)
+claude mcp add shiplint -- npx shiplint mcp
+```
 
 ## Documentation
 
-📖 **Full documentation, rules reference, CI/CD setup, and FAQ:** [`typescript/README.md`](./typescript/README.md)
+📖 **Full docs:** [`typescript/README.md`](./typescript/README.md)
+
+Includes:
+- All 15 rules with Apple guideline references
+- MCP setup (Claude Code, Cursor, Xcode 26.3)
+- CI/CD integration (GitHub Actions, Xcode Cloud)
+- FAQ and comparisons
 
 ## Repository Structure
 
 ```
-├── typescript/          # ShipLint CLI & scanning engine (npm package)
+ShipLint/
+├── typescript/          # CLI & scanning engine (npm package)
 │   ├── src/
-│   │   ├── rules/       # Rule definitions (privacy, auth, metadata, config)
-│   │   ├── cli/         # CLI entry point
+│   │   ├── cli/         # CLI + MCP server
+│   │   ├── rules/       # 15 rule definitions
+│   │   ├── formatters/  # text, json, sarif output
 │   │   └── ...
-│   ├── README.md        # ← Full documentation lives here
-│   └── package.json
-└── README.md            # This file (overview)
+│   ├── tests/           # 251 tests
+│   └── README.md        # Full documentation
+│
+├── analytics/           # Usage dashboard (Cloudflare Worker)
+│   ├── worker.js        # Stats API + public dashboard
+│   ├── schema.sql       # D1 (SQLite) schema
+│   └── README.md        # Deployment instructions
+│
+├── landing/             # Marketing site (shiplint.app)
+│   ├── index.html
+│   └── errors/          # Error code reference pages
+│
+├── action/              # GitHub Action (coming soon)
+│
+└── .github/workflows/   # CI pipeline
 ```
 
-## Quick Links
+## Analytics
 
-- 🌐 [shiplint.app](https://shiplint.app)
+ShipLint includes optional, anonymous telemetry to track aggregate usage. **No personal data or project info is collected.** The analytics backend is fully open source in `analytics/`.
+
+- View public stats: [shiplint.app/stats](https://shiplint.app/stats)
+- Opt-out: `SHIPLINT_NO_TELEMETRY=1`
+
+## Links
+
+- 🌐 [shiplint.app](https://shiplint.app) — Landing page
+- 📊 [shiplint.app/stats](https://shiplint.app/stats) — Usage stats
 - 📦 [npm: shiplint](https://www.npmjs.com/package/shiplint)
-- 💻 [GitHub: Signal26AI/ShipLint](https://github.com/Signal26AI/ShipLint)
+- 💻 [GitHub](https://github.com/Signal26AI/ShipLint)
 - 🐛 [Issues](https://github.com/Signal26AI/ShipLint/issues)
 
----
+## Contributing
 
-© 2025–2026 [Signal26](https://signal26.dev). All rights reserved.
+Found a missing rule? An ITMS error you keep hitting? [Open an issue](https://github.com/Signal26AI/ShipLint/issues) — we add rules based on real-world rejection patterns.
+
+## License
+
+MIT © 2025–2026 [Signal26](https://signal26.ai)

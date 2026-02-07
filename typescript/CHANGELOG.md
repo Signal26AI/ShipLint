@@ -5,6 +5,19 @@ All notable changes to ShipLint will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-02-07
+
+### Added
+
+- **Anonymous analytics**: Opt-out telemetry to track aggregate usage (rule triggers, finding counts). No personal data collected. Disable with `SHIPLINT_NO_TELEMETRY=1`.
+- **Public stats page**: View usage stats at shiplint.app/stats
+- **Enhanced MCP documentation**: Added setup guides for Claude Code, Cursor, and Xcode 26.3
+
+### Changed
+
+- README now includes comprehensive MCP integration section
+- README now documents analytics and opt-out
+
 ## [0.2.1] - 2026-02-03
 
 ### Fixed

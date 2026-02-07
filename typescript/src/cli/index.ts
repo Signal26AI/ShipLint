@@ -10,6 +10,7 @@ import { format } from '../formatters/index.js';
 import { allRules } from '../rules/index.js';
 import { OutputFormat } from '../types/index.js';
 import { startMcpServer } from '../mcp/server.js';
+import { ping, buildPayload } from './analytics.js';
 import packageJson from '../../package.json';
 
 const program = new Command();
@@ -41,6 +42,9 @@ program
       
       const output = await format(result, outputFormat);
       console.log(output);
+      
+      // Anonymous analytics ping (fire-and-forget, opt-out with SHIPLINT_NO_TELEMETRY=1)
+      ping(buildPayload(packageJson.version, result.findings));
       
       // Exit with error code if critical issues found
       const hasCritical = result.findings.some(f => f.severity === 'critical');

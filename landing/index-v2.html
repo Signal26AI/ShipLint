@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShipLint — Catch App Store Rejections Before They Happen</title>
+    <meta name="description" content="ShipLint scans your iOS project for App Store rejection risks — privacy manifests, entitlements, Info.plist issues. Works in your terminal, your AI agent, or your CI pipeline.">
+    <link rel="canonical" href="https://shiplint.app">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="ShipLint — Catch App Store Rejections Before They Happen">
+    <meta property="og:description" content="Free CLI that scans iOS projects for App Store rejection risks. Run it yourself, let your AI run it, or add it to CI.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://shiplint.app">
+    <meta property="og:site_name" content="ShipLint">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ShipLint — Catch App Store Rejections Before They Happen">
+    <meta name="twitter:description" content="Free CLI that scans iOS projects for App Store rejection risks before submission.">
+
+    <!-- Schema.org JSON-LD -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "ShipLint",
+        "description": "A free, open-source CLI tool that scans iOS projects for App Store rejection risks before submission. Catches privacy manifest issues, entitlement mismatches, Info.plist errors. Works standalone, with AI coding agents via MCP, or in CI pipelines.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "macOS, Linux, Windows",
+        "url": "https://shiplint.app",
+        "downloadUrl": "https://www.npmjs.com/package/shiplint",
+        "softwareVersion": "1.0.2",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "author": {
+            "@type": "Organization",
+            "name": "Signal26",
+            "url": "https://signal26.ai"
+        },
+        "codeRepository": "https://github.com/Signal26AI/ShipLint",
+        "license": "https://opensource.org/licenses/MIT"
+    }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        surface: {
+                            900: '#0d0d0f',
+                            800: '#141418',
+                            700: '#1c1c22',
+                            600: '#26262e',
+                            500: '#32323c',
+                        },
+                        accent: {
+                            DEFAULT: '#10b981',
+                            light: '#34d399',
+                            dim: '#065f46',
+                        },
+                        muted: '#9ca3af',
+                    },
+                    fontFamily: {
+                        mono: ['ui-monospace', 'SFMono-Regular', 'SF Mono', 'Menlo', 'Consolas', 'Liberation Mono', 'monospace'],
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        a:focus-visible, button:focus-visible {
+            outline: 2px solid #10b981;
+            outline-offset: 2px;
+        }
+
+        ::selection {
+            background: rgba(16, 185, 129, 0.3);
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        .cursor { animation: blink 1s step-end infinite; }
+
+        .copy-btn.copied { color: #10b981 !important; }
+
+        .code-block {
+            background: #0d0d0f;
+            border: 1px solid #26262e;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #10b981 0%, #34d399 50%, #6ee7b7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Chat bubble animation */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .chat-bubble {
+            animation: fadeInUp 0.3s ease-out forwards;
+        }
+        .chat-bubble:nth-child(1) { animation-delay: 0s; }
+        .chat-bubble:nth-child(2) { animation-delay: 0.8s; opacity: 0; }
+        .chat-bubble:nth-child(3) { animation-delay: 1.6s; opacity: 0; }
+        .chat-bubble:nth-child(4) { animation-delay: 2.4s; opacity: 0; }
+
+        /* Path card hover */
+        .path-card {
+            transition: border-color 0.2s ease, transform 0.2s ease;
+        }
+        .path-card:hover {
+            border-color: #10b981;
+            transform: translateY(-3px);
+        }
+
+        /* FAQ accordion */
+        details summary { cursor: pointer; list-style: none; }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::before {
+            content: '+';
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 0.375rem;
+            background: #1c1c22;
+            color: #10b981;
+            font-weight: 600;
+            margin-right: 0.75rem;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+        details[open] summary::before {
+            content: '−';
+            background: #10b981;
+            color: #0d0d0f;
+        }
+    </style>
+</head>
+<body class="bg-surface-900 text-gray-100 antialiased font-sans">
+    <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-accent text-black px-4 py-2 rounded-lg font-medium z-50">
+        Skip to main content
+    </a>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-surface-900/90 backdrop-blur-md border-b border-surface-600/50 z-40">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="/" class="flex items-center gap-2.5 font-semibold text-lg group">
+                    <svg class="w-7 h-7 text-accent group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>ShipLint</span>
+                </a>
+                <div class="flex items-center gap-6">
+                    <a href="#how-to-use" class="text-muted hover:text-white transition-colors hidden sm:block text-sm">Get Started</a>
+                    <a href="#what-it-catches" class="text-muted hover:text-white transition-colors hidden sm:block text-sm">Rules</a>
+                    <a href="#faq" class="text-muted hover:text-white transition-colors hidden sm:block text-sm">FAQ</a>
+                    <a href="https://github.com/Signal26AI/ShipLint" class="flex items-center gap-2 text-muted hover:text-white transition-colors" target="_blank" rel="noopener noreferrer">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="hidden sm:inline text-sm">GitHub</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main">
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- HERO: PROBLEM + SOLUTION -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section class="min-h-[85vh] flex items-center pt-16">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+                <div class="text-center max-w-3xl mx-auto mb-16">
+                    <p class="text-accent font-medium mb-4 text-sm tracking-wide uppercase">iOS App Store Pre-Submission Scanner</p>
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.1] mb-6">
+                        Catch rejections<br>
+                        <span class="gradient-text">before Apple does.</span>
+                    </h1>
+                    <p class="text-xl text-muted max-w-2xl mx-auto leading-relaxed">
+                        ShipLint scans your Xcode project for the issues that cause App Store rejections — privacy manifests, entitlements, Info.plist problems. Fix them before you submit.
+                    </p>
+                </div>
+
+                <!-- THREE PATHS -->
+                <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                    
+                    <!-- Path 1: CLI -->
+                    <a href="#cli-install" class="path-card bg-surface-800 border border-surface-600 rounded-2xl p-6 text-center block">
+                        <div class="w-14 h-14 bg-surface-700 rounded-xl flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-7 h-7 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-lg mb-2">Run it yourself</h3>
+                        <p class="text-sm text-muted mb-4">One command in your terminal. No setup, no account.</p>
+                        <code class="text-xs font-mono text-accent-light bg-surface-900 px-3 py-1.5 rounded-lg inline-block">npx shiplint scan .</code>
+                    </a>
+
+                    <!-- Path 2: AI Agent -->
+                    <a href="#ai-agent" class="path-card bg-surface-800 border border-surface-600 rounded-2xl p-6 text-center block">
+                        <div class="w-14 h-14 bg-surface-700 rounded-xl flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-7 h-7 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-lg mb-2">Let your AI run it</h3>
+                        <p class="text-sm text-muted mb-4">Works with Cursor, Claude Code, Xcode 26.3 via MCP.</p>
+                        <span class="text-xs font-mono text-accent-light bg-surface-900 px-3 py-1.5 rounded-lg inline-block">"Any issues before I submit?"</span>
+                    </a>
+
+                    <!-- Path 3: CI -->
+                    <a href="#ci-integration" class="path-card bg-surface-800 border border-surface-600 rounded-2xl p-6 text-center block">
+                        <div class="w-14 h-14 bg-surface-700 rounded-xl flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-7 h-7 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-lg mb-2">Add to CI</h3>
+                        <p class="text-sm text-muted mb-4">GitHub Actions, Xcode Cloud. Catch issues on every PR.</p>
+                        <span class="text-xs font-mono text-accent-light bg-surface-900 px-3 py-1.5 rounded-lg inline-block">SARIF output</span>
+                    </a>
+                </div>
+
+                <p class="text-center text-sm text-muted mt-8">
+                    Free and open source. 15 rules. Works with any iOS project.
+                </p>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- AI CONVERSATION DEMO -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="ai-agent" class="py-20 sm:py-28 bg-surface-800">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="grid lg:grid-cols-2 gap-12 items-center">
+                    
+                    <!-- Left: Explanation -->
+                    <div>
+                        <span class="text-accent font-medium text-sm uppercase tracking-wide">For AI-assisted development</span>
+                        <h2 class="text-3xl sm:text-4xl font-bold mt-3 mb-5">
+                            Ask your AI.<br>It'll know.
+                        </h2>
+                        <p class="text-lg text-muted leading-relaxed mb-6">
+                            If you're building with Cursor, Claude Code, or Xcode 26.3's built-in agents — ShipLint plugs right in via MCP. Just ask if you're ready to submit. Your AI finds the issues <em>and</em> fixes them.
+                        </p>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex items-center gap-3">
+                                <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span class="text-muted">Works with Xcode 26.3, Claude Code, Cursor</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span class="text-muted">AI reads the results and applies fixes automatically</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <svg class="w-5 h-5 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <span class="text-muted">One-line setup: <code class="text-accent-light text-xs">claude mcp add shiplint -- npx shiplint mcp</code></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Chat Demo -->
+                    <div class="code-block rounded-2xl overflow-hidden shadow-2xl">
+                        <div class="bg-surface-700 px-4 py-3 border-b border-surface-600 flex items-center gap-3">
+                            <div class="flex gap-1.5">
+                                <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+                                <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+                            </div>
+                            <span class="text-muted text-sm">Claude Code — MyVibeApp</span>
+                        </div>
+                        <div class="p-6 space-y-4 min-h-[320px]">
+                            <!-- User message -->
+                            <div class="chat-bubble flex justify-end">
+                                <div class="bg-accent/20 text-white rounded-2xl rounded-br-md px-4 py-2.5 max-w-[85%]">
+                                    <p class="text-sm">Any issues I should fix before submitting to the App Store?</p>
+                                </div>
+                            </div>
+
+                            <!-- AI thinking -->
+                            <div class="chat-bubble flex justify-start">
+                                <div class="bg-surface-700 rounded-2xl rounded-bl-md px-4 py-2.5 max-w-[85%]">
+                                    <p class="text-sm text-muted">Running ShipLint scan...</p>
+                                </div>
+                            </div>
+
+                            <!-- AI response with issues -->
+                            <div class="chat-bubble flex justify-start">
+                                <div class="bg-surface-700 rounded-2xl rounded-bl-md px-4 py-3 max-w-[90%]">
+                                    <p class="text-sm mb-3">Found <span class="text-red-400 font-semibold">2 issues</span> that would cause rejection:</p>
+                                    <div class="text-xs space-y-2 font-mono">
+                                        <div class="text-red-400">✗ Missing PrivacyInfo.xcprivacy for UserDefaults</div>
+                                        <div class="text-red-400">✗ NSCameraUsageDescription is too vague</div>
+                                    </div>
+                                    <p class="text-sm mt-3 text-muted">Fixing now...</p>
+                                </div>
+                            </div>
+
+                            <!-- AI fixed -->
+                            <div class="chat-bubble flex justify-start">
+                                <div class="bg-surface-700 rounded-2xl rounded-bl-md px-4 py-3 max-w-[90%]">
+                                    <p class="text-sm"><span class="text-accent font-semibold">Done.</span> Created privacy manifest, updated camera description. Re-scan shows <span class="text-accent">all checks passing</span>. Ready to submit.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- CLI INSTALL -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="cli-install" class="py-20 sm:py-28">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="grid lg:grid-cols-2 gap-12 items-center">
+                    
+                    <!-- Left: Terminal -->
+                    <div class="code-block rounded-2xl overflow-hidden shadow-2xl order-2 lg:order-1">
+                        <div class="bg-surface-700 px-4 py-3 flex items-center gap-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+                            <span class="ml-3 text-muted text-sm font-mono">Terminal</span>
+                        </div>
+                        <div class="p-6 font-mono text-sm leading-relaxed">
+                            <div class="text-muted">$ npx shiplint scan .</div>
+                            <div class="mt-3 text-white">ShipLint v1.0.2 — <span class="text-muted">scanning VibeApp.xcodeproj</span></div>
+                            <div class="mt-4 text-accent">✓ Bundle ID format valid</div>
+                            <div class="text-accent">✓ Version/build strings OK</div>
+                            <div class="text-accent">✓ App icon assets present</div>
+                            <div class="text-accent">✓ Privacy manifest complete</div>
+                            <div class="mt-2 text-red-400">✗ NSCameraUsageDescription too generic</div>
+                            <div class="text-red-400 pl-4 text-xs text-red-400/70">→ "Camera access" is vague — describe the feature</div>
+                            <div class="text-yellow-400">⚠ ATS exception needs justification note</div>
+                            <div class="mt-4 border-t border-surface-600 pt-4">
+                                <span class="text-red-400 font-semibold">1 error</span>
+                                <span class="text-surface-500"> · </span>
+                                <span class="text-yellow-400">1 warning</span>
+                                <span class="text-surface-500"> · </span>
+                                <span class="text-accent">4 passed</span>
+                            </div>
+                            <div class="mt-2 text-muted">$ <span class="cursor">▋</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Explanation -->
+                    <div class="order-1 lg:order-2">
+                        <span class="text-accent font-medium text-sm uppercase tracking-wide">For the "I run tools myself" crowd</span>
+                        <h2 class="text-3xl sm:text-4xl font-bold mt-3 mb-5">
+                            One command.<br>No config.
+                        </h2>
+                        <p class="text-lg text-muted leading-relaxed mb-6">
+                            Point ShipLint at your Xcode project. It scans Info.plist, entitlements, privacy manifests, and build settings. Tells you exactly what's wrong and how to fix it.
+                        </p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-sm text-muted mb-2 block">Install globally:</label>
+                                <div class="flex items-stretch">
+                                    <code class="flex-1 bg-surface-800 border border-surface-600 rounded-l-lg px-4 py-3 font-mono text-accent-light">
+                                        npm install -g shiplint
+                                    </code>
+                                    <button onclick="copyText('npm install -g shiplint', this)" class="copy-btn bg-surface-700 hover:bg-surface-600 border border-l-0 border-surface-600 rounded-r-lg px-4 transition-colors">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-sm text-muted mb-2 block">Or run directly with npx:</label>
+                                <div class="flex items-stretch">
+                                    <code class="flex-1 bg-surface-800 border border-surface-600 rounded-l-lg px-4 py-3 font-mono text-accent-light">
+                                        npx shiplint scan ./MyApp
+                                    </code>
+                                    <button onclick="copyText('npx shiplint scan ./MyApp', this)" class="copy-btn bg-surface-700 hover:bg-surface-600 border border-l-0 border-surface-600 rounded-r-lg px-4 transition-colors">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- CI INTEGRATION -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="ci-integration" class="py-20 sm:py-28 bg-surface-800">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center max-w-3xl mx-auto mb-12">
+                    <span class="text-accent font-medium text-sm uppercase tracking-wide">For teams</span>
+                    <h2 class="text-3xl sm:text-4xl font-bold mt-3 mb-5">Add to CI. Catch issues on every PR.</h2>
+                    <p class="text-lg text-muted">
+                        ShipLint outputs SARIF for GitHub code scanning. Issues appear inline on pull requests — before anyone merges bad config.
+                    </p>
+                </div>
+
+                <div class="code-block rounded-xl overflow-hidden max-w-3xl mx-auto">
+                    <div class="bg-surface-700 px-4 py-3 border-b border-surface-600 flex items-center justify-between">
+                        <span class="font-mono text-sm text-muted">.github/workflows/shiplint.yml</span>
+                        <button onclick="copyText(document.getElementById('github-action').textContent, this)" class="copy-btn text-muted hover:text-white transition-colors p-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <pre id="github-action" class="p-6 font-mono text-sm overflow-x-auto"><span class="text-muted">name:</span> <span class="text-accent-light">ShipLint</span>
+<span class="text-muted">on:</span> <span class="text-accent-light">[push, pull_request]</span>
+
+<span class="text-muted">jobs:</span>
+  <span class="text-muted">lint:</span>
+    <span class="text-muted">runs-on:</span> <span class="text-accent-light">ubuntu-latest</span>
+    <span class="text-muted">steps:</span>
+      - <span class="text-muted">uses:</span> <span class="text-accent-light">actions/checkout@v4</span>
+      - <span class="text-muted">run:</span> <span class="text-accent-light">npx shiplint scan . --format sarif > results.sarif</span>
+      - <span class="text-muted">uses:</span> <span class="text-accent-light">github/codeql-action/upload-sarif@v3</span>
+        <span class="text-muted">with:</span>
+          <span class="text-muted">sarif_file:</span> <span class="text-accent-light">results.sarif</span></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- XCODE 26.3 MCP SETUP -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="how-to-use" class="py-20 sm:py-28">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center max-w-3xl mx-auto mb-12">
+                    <h2 class="text-3xl sm:text-4xl font-bold mb-5">Works everywhere you code</h2>
+                    <p class="text-lg text-muted">
+                        Terminal, AI agents, CI pipelines — pick your path.
+                    </p>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Xcode 26.3 -->
+                    <div class="bg-surface-800 border border-surface-600 rounded-xl p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                                <span class="text-xl">🔨</span>
+                            </div>
+                            <h3 class="font-bold">Xcode 26.3</h3>
+                            <span class="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full">New</span>
+                        </div>
+                        <p class="text-sm text-muted mb-4">Add to Claude Agent or Codex in Xcode's Intelligence panel.</p>
+                        <code class="text-xs font-mono text-accent-light bg-surface-900 px-3 py-2 rounded block overflow-x-auto">~/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig</code>
+                    </div>
+
+                    <!-- Claude Code -->
+                    <div class="bg-surface-800 border border-surface-600 rounded-xl p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 bg-orange-500/10 rounded-lg flex items-center justify-center">
+                                <span class="text-xl">🤖</span>
+                            </div>
+                            <h3 class="font-bold">Claude Code</h3>
+                        </div>
+                        <p class="text-sm text-muted mb-4">One command to add ShipLint as an MCP server.</p>
+                        <code class="text-xs font-mono text-accent-light bg-surface-900 px-3 py-2 rounded block overflow-x-auto">claude mcp add shiplint -- npx shiplint mcp</code>
+                    </div>
+
+                    <!-- Cursor -->
+                    <div class="bg-surface-800 border border-surface-600 rounded-xl p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center">
+                                <span class="text-xl">▲</span>
+                            </div>
+                            <h3 class="font-bold">Cursor</h3>
+                        </div>
+                        <p class="text-sm text-muted mb-4">Add to your MCP config in Cursor settings.</p>
+                        <code class="text-xs font-mono text-accent-light bg-surface-900 px-3 py-2 rounded block overflow-x-auto">"command": "npx", "args": ["shiplint", "mcp"]</code>
+                    </div>
+
+                    <!-- Terminal -->
+                    <div class="bg-surface-800 border border-surface-600 rounded-xl p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 bg-green-500/10 rounded-lg flex items-center justify-center">
+                                <span class="text-xl">⌨️</span>
+                            </div>
+                            <h3 class="font-bold">Terminal</h3>
+                        </div>
+                        <p class="text-sm text-muted mb-4">Run directly. No AI required.</p>
+                        <code class="text-xs font-mono text-accent-light bg-surface-900 px-3 py-2 rounded block">npx shiplint scan .</code>
+                    </div>
+
+                    <!-- GitHub Actions -->
+                    <div class="bg-surface-800 border border-surface-600 rounded-xl p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 bg-gray-500/10 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                    <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                            <h3 class="font-bold">GitHub Actions</h3>
+                        </div>
+                        <p class="text-sm text-muted mb-4">SARIF output for code scanning integration.</p>
+                        <code class="text-xs font-mono text-accent-light bg-surface-900 px-3 py-2 rounded block">--format sarif</code>
+                    </div>
+
+                    <!-- Xcode Cloud -->
+                    <div class="bg-surface-800 border border-surface-600 rounded-xl p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                                <span class="text-xl">☁️</span>
+                            </div>
+                            <h3 class="font-bold">Xcode Cloud</h3>
+                        </div>
+                        <p class="text-sm text-muted mb-4">Add to ci_scripts/ci_post_clone.sh</p>
+                        <code class="text-xs font-mono text-accent-light bg-surface-900 px-3 py-2 rounded block">npx shiplint scan $CI_WORKSPACE</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- WHAT IT CATCHES -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="what-it-catches" class="py-20 sm:py-28 bg-surface-800">
+            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl sm:text-4xl font-bold mb-4">15 Rules. The Issues That Actually Cause Rejections.</h2>
+                    <p class="text-muted text-lg max-w-2xl mx-auto">
+                        Each rule maps to a real App Store rejection cause. ShipLint tells you what's wrong and how to fix it.
+                    </p>
+                </div>
+
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="bg-surface-700 border border-surface-600 rounded-xl p-5">
+                        <span class="text-xs font-mono text-red-400 bg-red-500/10 px-2 py-1 rounded mb-2 inline-block">ITMS-91053</span>
+                        <h3 class="font-semibold mb-1">Privacy Manifests</h3>
+                        <p class="text-sm text-muted">Missing PrivacyInfo.xcprivacy for required reason APIs.</p>
+                    </div>
+                    <div class="bg-surface-700 border border-surface-600 rounded-xl p-5">
+                        <span class="text-xs font-mono text-yellow-400 bg-yellow-500/10 px-2 py-1 rounded mb-2 inline-block">5.1.1</span>
+                        <h3 class="font-semibold mb-1">Usage Descriptions</h3>
+                        <p class="text-sm text-muted">Vague or missing NS*UsageDescription strings.</p>
+                    </div>
+                    <div class="bg-surface-700 border border-surface-600 rounded-xl p-5">
+                        <span class="text-xs font-mono text-red-400 bg-red-500/10 px-2 py-1 rounded mb-2 inline-block">ITMS-90078</span>
+                        <h3 class="font-semibold mb-1">Entitlements</h3>
+                        <p class="text-sm text-muted">Capabilities in code that don't match signing.</p>
+                    </div>
+                    <div class="bg-surface-700 border border-surface-600 rounded-xl p-5">
+                        <span class="text-xs font-mono text-yellow-400 bg-yellow-500/10 px-2 py-1 rounded mb-2 inline-block">2.1</span>
+                        <h3 class="font-semibold mb-1">Info.plist</h3>
+                        <p class="text-sm text-muted">Required keys, bundle ID format, version strings.</p>
+                    </div>
+                    <div class="bg-surface-700 border border-surface-600 rounded-xl p-5">
+                        <span class="text-xs font-mono text-yellow-400 bg-yellow-500/10 px-2 py-1 rounded mb-2 inline-block">2.1</span>
+                        <h3 class="font-semibold mb-1">App Transport Security</h3>
+                        <p class="text-sm text-muted">ATS exceptions that need justification.</p>
+                    </div>
+                    <div class="bg-surface-700 border border-surface-600 rounded-xl p-5">
+                        <span class="text-xs font-mono text-yellow-400 bg-yellow-500/10 px-2 py-1 rounded mb-2 inline-block">4.8</span>
+                        <h3 class="font-semibold mb-1">Sign in with Apple</h3>
+                        <p class="text-sm text-muted">Third-party login without SIWA entitlement.</p>
+                    </div>
+                </div>
+
+                <p class="text-center text-sm text-muted mt-8">
+                    <a href="/errors/" class="text-accent hover:text-accent-light underline underline-offset-2">View all 15 rules with detailed fix instructions →</a>
+                </p>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- FAQ -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="faq" class="py-20 sm:py-28">
+            <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl sm:text-4xl font-bold mb-4">FAQ</h2>
+                </div>
+
+                <div class="space-y-4">
+                    <details class="bg-surface-800 border border-surface-600 rounded-xl group">
+                        <summary class="flex items-center p-5 font-semibold cursor-pointer hover:text-accent transition-colors">
+                            Does ShipLint replace Fastlane?
+                        </summary>
+                        <div class="px-5 pb-5 pl-12 text-muted leading-relaxed">
+                            <p>No — they check different things. <strong class="text-white">Fastlane Precheck</strong> validates your App Store Connect listing (screenshots, description, age rating). <strong class="text-white">ShipLint</strong> validates your project files (Info.plist, entitlements, privacy manifests). Use both for full coverage.</p>
+                        </div>
+                    </details>
+
+                    <details class="bg-surface-800 border border-surface-600 rounded-xl group">
+                        <summary class="flex items-center p-5 font-semibold cursor-pointer hover:text-accent transition-colors">
+                            What's the difference from Xcode's validation?
+                        </summary>
+                        <div class="px-5 pb-5 pl-12 text-muted leading-relaxed">
+                            <p>Xcode's Archive → Validate catches binary-level issues and requires a full build. ShipLint runs in seconds, no build required, and catches config-level issues earlier in development.</p>
+                        </div>
+                    </details>
+
+                    <details class="bg-surface-800 border border-surface-600 rounded-xl group">
+                        <summary class="flex items-center p-5 font-semibold cursor-pointer hover:text-accent transition-colors">
+                            Is it free?
+                        </summary>
+                        <div class="px-5 pb-5 pl-12 text-muted leading-relaxed">
+                            <p>Yes. Free and open source under MIT license. No account, no limits.</p>
+                        </div>
+                    </details>
+
+                    <details class="bg-surface-800 border border-surface-600 rounded-xl group">
+                        <summary class="flex items-center p-5 font-semibold cursor-pointer hover:text-accent transition-colors">
+                            Does it work with SwiftUI / UIKit / React Native?
+                        </summary>
+                        <div class="px-5 pb-5 pl-12 text-muted leading-relaxed">
+                            <p>Yes. ShipLint checks project configuration, not Swift code. Works with any iOS project that has an Info.plist and Xcode project structure — native Swift, React Native, Flutter, whatever.</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- CTA -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section class="py-20 sm:py-28 bg-surface-800">
+            <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <h2 class="text-3xl sm:text-4xl font-bold mb-5">Ready to ship?</h2>
+                <p class="text-lg text-muted mb-8">Run ShipLint before you submit. Catch issues in seconds, not days.</p>
+                
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <div class="flex items-stretch">
+                        <code class="bg-surface-900 border border-surface-600 rounded-l-lg px-5 py-3 font-mono text-accent-light">
+                            npx shiplint scan .
+                        </code>
+                        <button onclick="copyText('npx shiplint scan .', this)" class="copy-btn bg-surface-700 hover:bg-surface-600 border border-l-0 border-surface-600 rounded-r-lg px-4 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <a href="https://github.com/Signal26AI/ShipLint" class="flex items-center gap-2 text-muted hover:text-white transition-colors" target="_blank">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"/>
+                        </svg>
+                        View on GitHub
+                    </a>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-surface-600/50 py-8">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>ShipLint by <a href="https://signal26.ai" class="text-accent hover:text-accent-light">Signal26</a></span>
+                </div>
+                <div class="flex items-center gap-6">
+                    <a href="https://github.com/Signal26AI/ShipLint" class="hover:text-white transition-colors">GitHub</a>
+                    <a href="https://www.npmjs.com/package/shiplint" class="hover:text-white transition-colors">npm</a>
+                    <a href="/errors/" class="hover:text-white transition-colors">Error Codes</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function copyText(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                button.classList.add('copied');
+                setTimeout(() => button.classList.remove('copied'), 2000);
+            });
+        }
+    </script>
+</body>
+</html>

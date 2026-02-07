@@ -176,6 +176,76 @@ shiplint scan ./MyApp --format sarif
 
 ---
 
+## MCP Integration (AI Agents)
+
+ShipLint includes a Model Context Protocol (MCP) server, letting AI coding assistants scan your project directly.
+
+### Claude Code
+
+```bash
+# Add ShipLint as an MCP server
+claude mcp add shiplint -- npx shiplint mcp
+```
+
+Then just ask Claude:
+> "Are there any App Store issues I should fix before submitting?"
+
+Claude will call ShipLint, find issues, and can fix them automatically.
+
+### Cursor / Windsurf
+
+Add to your MCP settings (`.cursor/mcp.json` or equivalent):
+
+```json
+{
+  "mcpServers": {
+    "shiplint": {
+      "command": "npx",
+      "args": ["shiplint", "mcp"]
+    }
+  }
+}
+```
+
+### Xcode 26.3 (Native MCP Support)
+
+Xcode 26.3 includes native support for MCP servers in the Intelligence panel. Add ShipLint to your Claude Agent or Codex config:
+
+**Config location:** `~/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig`
+
+```toml
+[mcp_servers.shiplint]
+command = "/bin/zsh"
+args = ["-lc", "npx shiplint mcp"]
+enabled = true
+```
+
+Then ask Xcode's AI: "Scan this project for App Store issues."
+
+### MCP Tools
+
+ShipLint exposes three tools via MCP:
+
+| Tool | Description |
+|------|-------------|
+| `shiplint_scan` | Scan a project for App Store issues |
+| `shiplint_rules` | List all available rules |
+| `shiplint_explain` | Explain a specific error code |
+
+### Example Conversation
+
+**You:** "Any issues before I submit to the App Store?"
+
+**AI:** *Calls shiplint_scan* "Found 2 issues:
+1. Missing `NSCameraUsageDescription` in Info.plist
+2. No privacy manifest for UserDefaults API
+
+I'll fix these now..."
+
+**AI:** *Edits files* "Done. Added camera usage description and created PrivacyInfo.xcprivacy. Re-scan shows all checks passing. Ready to submit."
+
+---
+
 ## CI/CD Integration
 
 ### GitHub Actions
@@ -282,6 +352,32 @@ Different tools cover different layers of the submission process. Here's where S
 ¹ *Xcode shows warnings at build time for some missing keys but does not block the archive/upload process.*
 
 **The ideal pipeline:** ShipLint (project files) → Xcode Validate (binary) → Fastlane Precheck (metadata) → Submit.
+
+---
+
+## Analytics
+
+ShipLint collects anonymous usage statistics to help improve the tool:
+
+- CLI version
+- Number of issues found (counts only)
+- Which rules triggered (rule IDs only)
+
+**No personal data, project names, or file contents are ever collected.**
+
+### Opt-out
+
+```bash
+# Disable telemetry for a single run
+SHIPLINT_NO_TELEMETRY=1 npx shiplint scan .
+
+# Disable permanently (add to your shell profile)
+export SHIPLINT_NO_TELEMETRY=1
+```
+
+### Public Stats
+
+View aggregate usage stats at [shiplint.app/stats](https://shiplint.app/stats).
 
 ---
 
