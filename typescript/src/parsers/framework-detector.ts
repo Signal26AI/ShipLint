@@ -210,6 +210,59 @@ export function parsePackageResolvedData(json: Record<string, unknown>): Depende
 }
 
 /**
+ * Directories to skip when scanning Swift source files
+ */
+const SWIFT_SCAN_SKIP_DIRS = new Set([
+  'node_modules', '.git', '.build', 'build', 'DerivedData',
+  'Pods', 'Carthage', '.swiftpm', 'Package.resolved',
+]);
+
+/**
+ * Scans Swift source files in a directory for `import` statements.
+ * Returns a Set of imported framework/module names.
+ */
+export function scanSwiftImports(projectDir: string): Set<string> {
+  const frameworks = new Set<string>();
+  const importRegex = /^import\s+(\w+)/gm;
+
+  function walk(dir: string, depth: number): void {
+    if (depth > MAX_SEARCH_DEPTH) return;
+    let entries: string[];
+    try {
+      entries = fs.readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (SWIFT_SCAN_SKIP_DIRS.has(entry)) continue;
+      const fullPath = path.join(dir, entry);
+      try {
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory() &&
+            !entry.endsWith('.xcodeproj') &&
+            !entry.endsWith('.xcworkspace') &&
+            !entry.endsWith('.app') &&
+            !entry.endsWith('.framework')) {
+          walk(fullPath, depth + 1);
+        } else if (stat.isFile() && entry.endsWith('.swift')) {
+          const content = fs.readFileSync(fullPath, 'utf-8');
+          let m: RegExpExecArray | null;
+          importRegex.lastIndex = 0;
+          while ((m = importRegex.exec(content)) !== null) {
+            frameworks.add(m[1]);
+          }
+        }
+      } catch {
+        // skip inaccessible files
+      }
+    }
+  }
+
+  walk(projectDir, 0);
+  return frameworks;
+}
+
+/**
  * Parses project.pbxproj to extract linked frameworks
  */
 export function parseProjectFrameworks(filePath: string): Set<string> {

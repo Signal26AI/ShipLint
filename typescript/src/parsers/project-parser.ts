@@ -11,7 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { parsePlist } from './plist-parser.js';
 import { parseEntitlements } from './entitlements-parser.js';
-import { parseProjectFrameworks, loadAllDependencies } from './framework-detector.js';
+import { parseProjectFrameworks, loadAllDependencies, scanSwiftImports } from './framework-detector.js';
 import { getWorkspaceProjects } from './workspace-parser.js';
 import { getMainTargetArtifacts, normalizeXcodePath } from './pbxproj-parser.js';
 import type { Dependency, ScanContext } from '../types/index.js';
@@ -632,6 +632,17 @@ export function createScanContext(discovery: ProjectDiscovery): ScanContext {
     }
   }
   
+  // Scan Swift source files for import statements (works for both xcodeproj and SwiftPM projects)
+  try {
+    const scanDir = discovery.projectScopeDir ?? discovery.projectPath;
+    const swiftImports = scanSwiftImports(scanDir);
+    for (const fw of swiftImports) {
+      linkedFrameworks.add(fw);
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not scan Swift imports: ${error}`);
+  }
+
   // Load dependencies (P2-A FIX: scope to dependencyScopeDir to prevent picking up sibling project lockfiles)
   try {
     dependencies = loadAllDependencies(discovery.dependencyScopeDir ?? discovery.projectScopeDir ?? discovery.projectPath);

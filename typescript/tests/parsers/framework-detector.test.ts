@@ -11,7 +11,8 @@ import {
   parsePodfileLockContent,
   parsePackageResolvedData,
   detectTrackingSDKs,
-  detectSocialLoginSDKs 
+  detectSocialLoginSDKs,
+  scanSwiftImports 
 } from '../../src/parsers/framework-detector';
 import { DependencySource } from '../../src/types';
 
@@ -416,5 +417,88 @@ COCOAPODS: 1.12.0
     const deps = loadDependenciesForProject(appXcode);
     
     expect(deps.some(d => d.name === 'SnapKit')).toBe(true);
+  });
+});
+
+describe('scanSwiftImports', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'swift-imports-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('detects import statements from Swift files', () => {
+    fs.writeFileSync(path.join(tempDir, 'App.swift'), `
+import UIKit
+import CoreLocation
+import Foundation
+
+class AppDelegate: UIResponder {}
+`);
+    const result = scanSwiftImports(tempDir);
+    expect(result.has('UIKit')).toBe(true);
+    expect(result.has('CoreLocation')).toBe(true);
+    expect(result.has('Foundation')).toBe(true);
+  });
+
+  it('scans subdirectories recursively', () => {
+    const sub = path.join(tempDir, 'Sources', 'App');
+    fs.mkdirSync(sub, { recursive: true });
+    fs.writeFileSync(path.join(sub, 'Camera.swift'), `import AVFoundation\nimport Photos\n`);
+    const result = scanSwiftImports(tempDir);
+    expect(result.has('AVFoundation')).toBe(true);
+    expect(result.has('Photos')).toBe(true);
+  });
+
+  it('skips excluded directories like node_modules and .build', () => {
+    const excluded = path.join(tempDir, '.build', 'checkouts', 'Lib');
+    fs.mkdirSync(excluded, { recursive: true });
+    fs.writeFileSync(path.join(excluded, 'Lib.swift'), 'import SomeInternalLib\n');
+    fs.writeFileSync(path.join(tempDir, 'Main.swift'), 'import UIKit\n');
+    const result = scanSwiftImports(tempDir);
+    expect(result.has('UIKit')).toBe(true);
+    expect(result.has('SomeInternalLib')).toBe(false);
+  });
+
+  it('returns empty set for directory with no Swift files', () => {
+    fs.writeFileSync(path.join(tempDir, 'README.md'), '# Hello');
+    const result = scanSwiftImports(tempDir);
+    expect(result.size).toBe(0);
+  });
+
+  it('handles multiple imports in the same file', () => {
+    fs.writeFileSync(path.join(tempDir, 'Multi.swift'), `
+import CoreBluetooth
+import LocalAuthentication
+import Contacts
+import ContactsUI
+`);
+    const result = scanSwiftImports(tempDir);
+    expect(result.has('CoreBluetooth')).toBe(true);
+    expect(result.has('LocalAuthentication')).toBe(true);
+    expect(result.has('Contacts')).toBe(true);
+    expect(result.has('ContactsUI')).toBe(true);
+  });
+
+  it('deduplicates imports across files', () => {
+    fs.writeFileSync(path.join(tempDir, 'A.swift'), 'import UIKit\n');
+    fs.writeFileSync(path.join(tempDir, 'B.swift'), 'import UIKit\nimport MapKit\n');
+    const result = scanSwiftImports(tempDir);
+    expect(result.has('UIKit')).toBe(true);
+    expect(result.has('MapKit')).toBe(true);
+    // Set naturally deduplicates
+    expect(result.size).toBe(2);
+  });
+
+  it('skips Pods directory', () => {
+    const pods = path.join(tempDir, 'Pods', 'AFNetworking');
+    fs.mkdirSync(pods, { recursive: true });
+    fs.writeFileSync(path.join(pods, 'AF.swift'), 'import Security\n');
+    const result = scanSwiftImports(tempDir);
+    expect(result.has('Security')).toBe(false);
   });
 });
