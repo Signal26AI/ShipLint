@@ -91,7 +91,7 @@ export function createMcpServer(): McpServer {
         }),
       },
     },
-    async ({ path, rules, exclude }) => {
+    async ({ path, rules, exclude }: { path: string; rules?: string[]; exclude?: string[] }) => {
       try {
         const result = await scan({
           path,
@@ -268,7 +268,7 @@ export function createMcpServer(): McpServer {
         guidelineUrl: z.string(),
       },
     },
-    async ({ ruleId }) => {
+    async ({ ruleId }: { ruleId: string }) => {
       const rule = getRule(ruleId);
 
       if (!rule) {
