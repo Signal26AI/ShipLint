@@ -21,6 +21,11 @@ export const MissingLaunchStoryboardRule: Rule = {
   guidelineReference: '4.0',
 
   async evaluate(context: ScanContext): Promise<Finding[]> {
+    // App extensions don't need a launch storyboard
+    if (context.isExtension()) {
+      return [];
+    }
+
     // Only flag if the key is completely absent.
     // An empty string is valid (SwiftUI lifecycle apps use empty UILaunchStoryboardName).
     if (context.hasPlistKey('UILaunchStoryboardName')) {

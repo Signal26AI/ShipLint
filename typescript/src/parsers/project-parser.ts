@@ -729,7 +729,13 @@ export function createContextObject(
     
     plistString(key: string): string | undefined {
       const value = this.infoPlist[key];
-      return typeof value === 'string' ? value : undefined;
+      if (typeof value === 'string') return value;
+      // Fallback: check INFOPLIST_KEY_* build settings when generating Info.plist
+      if (this.generatesInfoPlist()) {
+        const bsValue = this.buildSettings[`INFOPLIST_KEY_${key}`];
+        if (typeof bsValue === 'string') return bsValue;
+      }
+      return undefined;
     },
     
     plistArray(key: string): unknown[] | undefined {
@@ -739,11 +745,23 @@ export function createContextObject(
     
     plistBool(key: string): boolean | undefined {
       const value = this.infoPlist[key];
-      return typeof value === 'boolean' ? value : undefined;
+      if (typeof value === 'boolean') return value;
+      // Fallback: check INFOPLIST_KEY_* build settings when generating Info.plist
+      if (this.generatesInfoPlist()) {
+        const bsValue = this.buildSettings[`INFOPLIST_KEY_${key}`];
+        if (bsValue === 'YES') return true;
+        if (bsValue === 'NO') return false;
+      }
+      return undefined;
     },
     
     hasPlistKey(key: string): boolean {
-      return key in this.infoPlist;
+      if (key in this.infoPlist) return true;
+      // Fallback: check INFOPLIST_KEY_* build settings when generating Info.plist
+      if (this.generatesInfoPlist()) {
+        return (`INFOPLIST_KEY_${key}`) in this.buildSettings;
+      }
+      return false;
     },
     
     hasFramework(name: string): boolean {
@@ -775,6 +793,19 @@ export function createContextObject(
 
     generatesInfoPlist(): boolean {
       return this.buildSettings['GENERATE_INFOPLIST_FILE'] === 'YES';
+    },
+
+    isExtension(): boolean {
+      // Check Info.plist for NSExtension key (present in all app extensions)
+      if ('NSExtension' in this.infoPlist || 'NSExtensionPointIdentifier' in this.infoPlist) {
+        return true;
+      }
+      // Check build setting for product type
+      const productType = this.buildSettings['PRODUCT_TYPE'];
+      if (productType && productType.includes('app-extension')) {
+        return true;
+      }
+      return false;
     },
   };
 }

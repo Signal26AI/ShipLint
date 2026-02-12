@@ -21,6 +21,11 @@ export const MissingSupportedOrientationsRule: Rule = {
   guidelineReference: '4.0',
 
   async evaluate(context: ScanContext): Promise<Finding[]> {
+    // App extensions don't need orientation declarations
+    if (context.isExtension()) {
+      return [];
+    }
+
     const orientations = context.plistArray('UISupportedInterfaceOrientations');
 
     // Modern Xcode projects (14+) with GENERATE_INFOPLIST_FILE = YES use build settings

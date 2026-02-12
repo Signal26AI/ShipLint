@@ -130,6 +130,8 @@ export interface ScanContext {
   buildSettingValue(key: string): string | undefined;
   /** Whether the project uses GENERATE_INFOPLIST_FILE = YES */
   generatesInfoPlist(): boolean;
+  /** Whether this target is an app extension (not a full app) */
+  isExtension(): boolean;
 }
 
 /**

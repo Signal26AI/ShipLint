@@ -21,6 +21,11 @@ export const MissingEncryptionFlagRule: Rule = {
   guidelineReference: 'Export Compliance',
 
   async evaluate(context: ScanContext): Promise<Finding[]> {
+    // App extensions don't need export compliance flags
+    if (context.isExtension()) {
+      return [];
+    }
+
     // If the key exists (true or false), the developer has declared their intent
     if (context.hasPlistKey('ITSAppUsesNonExemptEncryption')) {
       return [];

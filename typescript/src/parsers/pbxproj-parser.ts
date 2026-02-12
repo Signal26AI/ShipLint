@@ -252,10 +252,18 @@ export function parseBuildConfigurations(content: string): Map<string, PbxprojBu
     
     // Parse build settings
     const buildSettings: Record<string, string> = {};
-    const settingRegex = /(\w+)\s*=\s*"?([^";]+)"?\s*;/g;
+    // Match unquoted keys (WORD) and quoted keys ("KEY[sdk=...]")
+    const settingRegex = /(?:"([^"]+)"|(\w+))\s*=\s*(?:"([^"]*)"|([^";]*))\s*;/g;
     let settingMatch;
     while ((settingMatch = settingRegex.exec(settingsBlock)) !== null) {
-      buildSettings[settingMatch[1]] = settingMatch[2].trim();
+      const rawKey = (settingMatch[1] || settingMatch[2]).trim();
+      const value = (settingMatch[3] ?? settingMatch[4] ?? '').trim();
+      buildSettings[rawKey] = value;
+      // Also store without SDK condition suffix so rules can match base key
+      const baseKey = rawKey.replace(/\[.*\]$/, '');
+      if (baseKey !== rawKey && !(baseKey in buildSettings)) {
+        buildSettings[baseKey] = value;
+      }
     }
     
     configs.set(id, {
