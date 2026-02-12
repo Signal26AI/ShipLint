@@ -39,7 +39,6 @@ import { MissingFaceIdPurposeRule } from './privacy/missing-face-id-purpose.js';
 import { MissingSupportedOrientationsRule } from './metadata/missing-supported-orientations.js';
 import { RequiredReasonAPIRule } from './privacy/required-reason-api.js';
 import { PrivateAPIUsageRule } from './code/private-api-usage.js';
-import { ExternalPaymentRule } from './code/external-payment.js';
 import { DynamicCodeExecutionRule } from './code/dynamic-code-execution.js';
 
 /**
@@ -63,7 +62,6 @@ export const allRules: Rule[] = [
   MissingLaunchStoryboardRule,
   RequiredReasonAPIRule,
   PrivateAPIUsageRule,
-  ExternalPaymentRule,
   DynamicCodeExecutionRule,
 ];
 
