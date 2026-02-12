@@ -1,5 +1,6 @@
 /**
  * Text formatter for human-readable output
+ * v1.4: Ship verdict, severity grouping, scanner breakdown
  */
 import type { ScanResult, Finding } from '../types/index.js';
 import { Severity, Confidence } from '../types/index.js';
@@ -48,6 +49,17 @@ function getConfidenceLabel(confidence: Confidence): string {
 }
 
 /**
+ * Severity sort order
+ */
+const SEVERITY_ORDER: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  info: 4,
+};
+
+/**
  * Format a single finding
  */
 async function formatFinding(finding: Finding, index: number): Promise<string> {
@@ -92,6 +104,18 @@ async function formatFinding(finding: Finding, index: number): Promise<string> {
 }
 
 /**
+ * Get scanner name from rule ID
+ */
+function getScannerFromRuleId(ruleId: string): string {
+  if (ruleId.startsWith('privacy-')) return 'Privacy';
+  if (ruleId.startsWith('auth-')) return 'Auth';
+  if (ruleId.startsWith('metadata-')) return 'Metadata';
+  if (ruleId.startsWith('config-')) return 'Config';
+  if (ruleId.startsWith('code-')) return 'Code Analysis';
+  return 'Other';
+}
+
+/**
  * Format scan results as text
  */
 export async function formatText(result: ScanResult): Promise<string> {
@@ -106,20 +130,38 @@ export async function formatText(result: ScanResult): Promise<string> {
   lines.push(`📊 Rules run: ${result.rulesRun.length}`);
   lines.push('');
   
-  if (result.findings.length === 0) {
-    lines.push(c.green.bold('✅ No issues found! Your app looks ready for review.'));
-    lines.push('');
-    return lines.join('\n');
-  }
-  
-  // Summary by severity
+  // Count by severity
   const bySeverity = new Map<Severity, Finding[]>();
   for (const finding of result.findings) {
     const existing = bySeverity.get(finding.severity) ?? [];
     existing.push(finding);
     bySeverity.set(finding.severity, existing);
   }
+
+  const criticalCount = (bySeverity.get(Severity.Critical)?.length ?? 0) +
+                        (bySeverity.get(Severity.High)?.length ?? 0);
+
+  // ═══ SHIP VERDICT ═══
+  if (result.findings.length === 0) {
+    lines.push(c.green.bold('═'.repeat(60)));
+    lines.push(c.green.bold('  ✅  PASS — 0 critical issues. Your app looks ready for review.'));
+    lines.push(c.green.bold('═'.repeat(60)));
+    lines.push('');
+    return lines.join('\n');
+  }
+
+  if (criticalCount > 0) {
+    lines.push(c.red.bold('═'.repeat(60)));
+    lines.push(c.red.bold(`  ❌  NOT READY — ${criticalCount} critical/high issue(s) found`));
+    lines.push(c.red.bold('═'.repeat(60)));
+  } else {
+    lines.push(c.yellow.bold('═'.repeat(60)));
+    lines.push(c.yellow.bold(`  ⚠️  REVIEW — ${result.findings.length} issue(s) found (no critical)`));
+    lines.push(c.yellow.bold('═'.repeat(60)));
+  }
+  lines.push('');
   
+  // Summary by severity
   lines.push(c.bold('📊 Summary:'));
   const severityOrder = [Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info];
   for (const severity of severityOrder) {
@@ -130,22 +172,48 @@ export async function formatText(result: ScanResult): Promise<string> {
     }
   }
   lines.push('');
+
+  // Scanner breakdown
+  const byScanner = new Map<string, Finding[]>();
+  for (const finding of result.findings) {
+    const scanner = getScannerFromRuleId(finding.ruleId);
+    const existing = byScanner.get(scanner) ?? [];
+    existing.push(finding);
+    byScanner.set(scanner, existing);
+  }
+
+  lines.push(c.bold('🔧 Scanner Breakdown:'));
+  for (const [scanner, findings] of byScanner.entries()) {
+    const critCount = findings.filter(f => f.severity === Severity.Critical || f.severity === Severity.High).length;
+    const tag = critCount > 0 ? c.red(`(${critCount} critical/high)`) : c.green('(clean)');
+    lines.push(`   ${scanner}: ${findings.length} finding(s) ${tag}`);
+  }
+  lines.push('');
   
-  // Findings
-  lines.push(c.bold.underline(`\n🔍 Found ${result.findings.length} issue(s):\n`));
-  
-  // Sort by severity
+  // Findings grouped by severity
   const sortedFindings = [...result.findings].sort((a, b) => {
-    const order = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
-    return order[a.severity] - order[b.severity];
+    return SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
   });
-  
-  for (let i = 0; i < sortedFindings.length; i++) {
-    const formattedFinding = await formatFinding(sortedFindings[i], i);
+
+  let currentSeverity: Severity | null = null;
+  let findingIndex = 0;
+
+  for (const finding of sortedFindings) {
+    if (finding.severity !== currentSeverity) {
+      currentSeverity = finding.severity;
+      const color = getSeverityColor(currentSeverity);
+      const count = bySeverity.get(currentSeverity)?.length ?? 0;
+      lines.push('');
+      lines.push(color(`${'─'.repeat(60)}`));
+      lines.push(color(`  ${currentSeverity.toUpperCase()} (${count})`));
+      lines.push(color(`${'─'.repeat(60)}`));
+      lines.push('');
+    }
+
+    const formattedFinding = await formatFinding(finding, findingIndex);
     lines.push(formattedFinding);
     lines.push('');
-    lines.push(c.dim('   ' + '─'.repeat(60)));
-    lines.push('');
+    findingIndex++;
   }
   
   return lines.join('\n');
