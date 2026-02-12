@@ -13,7 +13,7 @@ import { parsePlist } from './plist-parser.js';
 import { parseEntitlements } from './entitlements-parser.js';
 import { parseProjectFrameworks, loadAllDependencies, scanSwiftImports } from './framework-detector.js';
 import { getWorkspaceProjects } from './workspace-parser.js';
-import { getMainTargetArtifacts, normalizeXcodePath } from './pbxproj-parser.js';
+import { getMainTargetArtifacts, normalizeXcodePath, parsePbxprojTargets, getMainAppTarget, getTargetBuildSettings, parseBuildConfigurations, parseConfigurationLists } from './pbxproj-parser.js';
 import type { Dependency, ScanContext } from '../types/index.js';
 
 /**
@@ -604,6 +604,7 @@ export function createScanContext(discovery: ProjectDiscovery): ScanContext {
   let entitlements: Record<string, unknown> = {};
   let linkedFrameworks = new Set<string>();
   let dependencies: Dependency[] = [];
+  let buildSettings: Record<string, string> = {};
   
   // Parse Info.plist
   if (discovery.infoPlistPath) {
@@ -623,12 +624,50 @@ export function createScanContext(discovery: ProjectDiscovery): ScanContext {
     }
   }
   
-  // Parse frameworks from pbxproj
+  // Parse frameworks and build settings from pbxproj
   if (discovery.pbxprojPath) {
     try {
       linkedFrameworks = parseProjectFrameworks(discovery.pbxprojPath);
     } catch (error) {
       console.warn(`Warning: Could not parse project frameworks: ${error}`);
+    }
+
+    // Extract build settings from the main app target
+    try {
+      const content = fs.readFileSync(discovery.pbxprojPath, 'utf-8');
+      const projectName = path.basename(path.dirname(discovery.pbxprojPath)).replace('.xcodeproj', '');
+      const targets = parsePbxprojTargets(content);
+      const mainTarget = getMainAppTarget(targets, projectName);
+      if (mainTarget) {
+        const settings = getTargetBuildSettings(content, mainTarget);
+        // getTargetBuildSettings returns TargetBuildSettings with limited fields;
+        // we need the raw build settings, so re-parse for the selected config
+        const configLists = parseConfigurationLists(content);
+        const configs = parseBuildConfigurations(content);
+        const configList = configLists.get(mainTarget.buildConfigurationListId);
+        if (configList) {
+          // Prefer Release config
+          for (const configId of configList.buildConfigurationIds) {
+            const config = configs.get(configId);
+            if (config && config.name.toLowerCase() === 'release') {
+              buildSettings = config.buildSettings;
+              break;
+            }
+          }
+          // Fallback to first config
+          if (Object.keys(buildSettings).length === 0) {
+            for (const configId of configList.buildConfigurationIds) {
+              const config = configs.get(configId);
+              if (config) {
+                buildSettings = config.buildSettings;
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not extract build settings: ${error}`);
     }
   }
   
@@ -658,7 +697,8 @@ export function createScanContext(discovery: ProjectDiscovery): ScanContext {
     dependencies,
     discovery.infoPlistPath,
     discovery.entitlementsPath,
-    discovery.pbxprojPath
+    discovery.pbxprojPath,
+    buildSettings
   );
 }
 
@@ -673,7 +713,8 @@ export function createContextObject(
   dependencies: Dependency[],
   infoPlistPath?: string,
   entitlementsPath?: string,
-  pbxprojPath?: string
+  pbxprojPath?: string,
+  buildSettings?: Record<string, string>
 ): ScanContext {
   return {
     projectPath,
@@ -684,6 +725,7 @@ export function createContextObject(
     pbxprojPath,
     linkedFrameworks,
     dependencies,
+    buildSettings: buildSettings ?? {},
     
     plistString(key: string): string | undefined {
       const value = this.infoPlist[key];
@@ -720,6 +762,19 @@ export function createContextObject(
     entitlementArray(key: string): unknown[] | undefined {
       const value = this.entitlements[key];
       return Array.isArray(value) ? value : undefined;
+    },
+
+    hasBuildSetting(key: string): boolean {
+      return key in this.buildSettings;
+    },
+
+    buildSettingValue(key: string): string | undefined {
+      const value = this.buildSettings[key];
+      return value !== undefined ? value : undefined;
+    },
+
+    generatesInfoPlist(): boolean {
+      return this.buildSettings['GENERATE_INFOPLIST_FILE'] === 'YES';
     },
   };
 }

@@ -26,6 +26,12 @@ export const MissingEncryptionFlagRule: Rule = {
       return [];
     }
 
+    // Modern Xcode projects (14+) with GENERATE_INFOPLIST_FILE = YES may set this via build settings
+    if (context.generatesInfoPlist() &&
+        context.hasBuildSetting('INFOPLIST_KEY_ITSAppUsesNonExemptEncryption')) {
+      return [];
+    }
+
     return [
       makeFinding(this, {
         description: `Your Info.plist is missing the ITSAppUsesNonExemptEncryption key. ` +

@@ -27,6 +27,20 @@ export const MissingLaunchStoryboardRule: Rule = {
       return [];
     }
 
+    // UILaunchScreen (dict) is a valid modern alternative to UILaunchStoryboardName (string)
+    if (context.hasPlistKey('UILaunchScreen')) {
+      return [];
+    }
+
+    // Modern Xcode projects (14+) with GENERATE_INFOPLIST_FILE = YES use build settings
+    // instead of a source Info.plist for launch screen configuration
+    if (context.generatesInfoPlist()) {
+      if (context.hasBuildSetting('INFOPLIST_KEY_UILaunchScreen_Generation') ||
+          context.hasBuildSetting('INFOPLIST_KEY_UILaunchStoryboardName')) {
+        return [];
+      }
+    }
+
     return [
       makeFinding(this, {
         description: `Your Info.plist is missing the UILaunchStoryboardName key. Since April 2020, ` +

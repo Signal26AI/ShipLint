@@ -23,6 +23,15 @@ export const MissingSupportedOrientationsRule: Rule = {
   async evaluate(context: ScanContext): Promise<Finding[]> {
     const orientations = context.plistArray('UISupportedInterfaceOrientations');
 
+    // Modern Xcode projects (14+) with GENERATE_INFOPLIST_FILE = YES use build settings
+    if (orientations === undefined && context.generatesInfoPlist()) {
+      if (context.hasBuildSetting('INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone') ||
+          context.hasBuildSetting('INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad') ||
+          context.hasBuildSetting('INFOPLIST_KEY_UISupportedInterfaceOrientations')) {
+        return [];
+      }
+    }
+
     // Case 1: Key completely missing
     if (orientations === undefined) {
       return [

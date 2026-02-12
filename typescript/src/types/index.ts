@@ -114,6 +114,8 @@ export interface ScanContext {
   pbxprojPath?: string;
   linkedFrameworks: Set<string>;
   dependencies: Dependency[];
+  /** Build settings from the main target's build configuration */
+  buildSettings: Record<string, string>;
   
   // Helper methods
   plistString(key: string): string | undefined;
@@ -124,6 +126,10 @@ export interface ScanContext {
   hasEntitlement(key: string): boolean;
   entitlementString(key: string): string | undefined;
   entitlementArray(key: string): unknown[] | undefined;
+  hasBuildSetting(key: string): boolean;
+  buildSettingValue(key: string): string | undefined;
+  /** Whether the project uses GENERATE_INFOPLIST_FILE = YES */
+  generatesInfoPlist(): boolean;
 }
 
 /**
