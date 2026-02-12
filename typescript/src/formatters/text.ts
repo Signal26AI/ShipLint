@@ -138,26 +138,30 @@ export async function formatText(result: ScanResult): Promise<string> {
     bySeverity.set(finding.severity, existing);
   }
 
-  const criticalCount = (bySeverity.get(Severity.Critical)?.length ?? 0) +
-                        (bySeverity.get(Severity.High)?.length ?? 0);
+  const criticalCount = bySeverity.get(Severity.Critical)?.length ?? 0;
+  const highCount = bySeverity.get(Severity.High)?.length ?? 0;
+  const mediumCount = bySeverity.get(Severity.Medium)?.length ?? 0;
 
   // ═══ SHIP VERDICT ═══
-  if (result.findings.length === 0) {
-    lines.push(c.green.bold('═'.repeat(60)));
-    lines.push(c.green.bold('  ✅  PASS — 0 critical issues. Your app looks ready for review.'));
-    lines.push(c.green.bold('═'.repeat(60)));
-    lines.push('');
-    return lines.join('\n');
-  }
-
+  // NOT READY only when CRITICAL findings exist
+  // REVIEW when HIGH or MEDIUM findings exist (no CRITICAL)
+  // PASS otherwise (only LOW/INFO, or no findings)
   if (criticalCount > 0) {
     lines.push(c.red.bold('═'.repeat(60)));
-    lines.push(c.red.bold(`  ❌  NOT READY — ${criticalCount} critical/high issue(s) found`));
+    lines.push(c.red.bold(`  ❌  NOT READY — ${criticalCount} critical issue(s) found`));
     lines.push(c.red.bold('═'.repeat(60)));
-  } else {
+  } else if (highCount > 0 || mediumCount > 0) {
     lines.push(c.yellow.bold('═'.repeat(60)));
     lines.push(c.yellow.bold(`  ⚠️  REVIEW — ${result.findings.length} issue(s) found (no critical)`));
     lines.push(c.yellow.bold('═'.repeat(60)));
+  } else {
+    lines.push(c.green.bold('═'.repeat(60)));
+    lines.push(c.green.bold('  ✅  PASS — 0 critical issues. Your app looks ready for review.'));
+    lines.push(c.green.bold('═'.repeat(60)));
+    if (result.findings.length === 0) {
+      lines.push('');
+      return lines.join('\n');
+    }
   }
   lines.push('');
   
