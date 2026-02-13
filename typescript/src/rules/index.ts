@@ -15,6 +15,9 @@ export * from './metadata/index.js';
 // Config rules
 export * from './config/index.js';
 
+// Code analysis rules
+export * from './code/index.js';
+
 // Base utilities
 export * from './base.js';
 
@@ -35,6 +38,8 @@ import { MissingBluetoothPurposeRule } from './privacy/missing-bluetooth-purpose
 import { MissingFaceIdPurposeRule } from './privacy/missing-face-id-purpose.js';
 import { MissingSupportedOrientationsRule } from './metadata/missing-supported-orientations.js';
 import { RequiredReasonAPIRule } from './privacy/required-reason-api.js';
+import { PrivateAPIUsageRule } from './code/private-api-usage.js';
+import { DynamicCodeExecutionRule } from './code/dynamic-code-execution.js';
 
 /**
  * All available rules
@@ -56,6 +61,8 @@ export const allRules: Rule[] = [
   MissingEncryptionFlagRule,
   MissingLaunchStoryboardRule,
   RequiredReasonAPIRule,
+  PrivateAPIUsageRule,
+  DynamicCodeExecutionRule,
 ];
 
 /**

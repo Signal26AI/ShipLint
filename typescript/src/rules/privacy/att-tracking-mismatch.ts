@@ -29,6 +29,24 @@ export const ATTTrackingMismatchRule: Rule = {
     // Detect tracking SDKs from dependencies
     const detectedSDKs = detectTrackingSDKs(context.dependencies);
     
+    // Also detect from linked frameworks / Swift imports
+    const trackingFrameworkMap: Record<string, string> = {
+      'AdSupport': 'AdSupport (IDFA)',
+      'FBSDKCoreKit': 'Facebook SDK',
+      'FacebookCore': 'Facebook SDK',
+      'FBAudienceNetwork': 'Facebook Audience Network',
+      'GoogleMobileAds': 'Google Mobile Ads',
+      'FirebaseAnalytics': 'Firebase Analytics',
+      'Adjust': 'Adjust',
+      'AppsFlyerLib': 'AppsFlyer',
+    };
+    
+    for (const [framework, name] of Object.entries(trackingFrameworkMap)) {
+      if (context.hasFramework(framework) && !detectedSDKs.includes(name)) {
+        detectedSDKs.push(name);
+      }
+    }
+    
     if (detectedSDKs.length === 0) {
       return [];
     }
