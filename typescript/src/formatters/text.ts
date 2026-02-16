@@ -15,13 +15,36 @@ async function getChalk() {
   return chalk;
 }
 
+const SEVERITY_ORDER: Severity[] = [
+  Severity.Critical,
+  Severity.High,
+  Severity.Medium,
+  Severity.Low,
+  Severity.Info,
+];
+
+function getSeverityRank(severity: Severity): number {
+  switch (severity) {
+    case Severity.Critical:
+      return 0;
+    case Severity.High:
+      return 1;
+    case Severity.Medium:
+      return 2;
+    case Severity.Low:
+      return 3;
+    case Severity.Info:
+      return 4;
+  }
+}
+
 /**
  * Get severity color
  */
 function getSeverityColor(severity: Severity): (text: string) => string {
   switch (severity) {
     case Severity.Critical:
-      return (text) => chalk.red.bold(text);
+      return (text) => chalk.redBright.bold(text);
     case Severity.High:
       return (text) => chalk.red(text);
     case Severity.Medium:
@@ -33,61 +56,141 @@ function getSeverityColor(severity: Severity): (text: string) => string {
   }
 }
 
+function getSeverityBadge(severity: Severity): string {
+  switch (severity) {
+    case Severity.Critical:
+      return chalk.bgRedBright.black.bold(' CRITICAL ');
+    case Severity.High:
+      return chalk.bgRed.black.bold(' HIGH ');
+    case Severity.Medium:
+      return chalk.bgYellow.black.bold(' MEDIUM ');
+    case Severity.Low:
+      return chalk.bgBlue.black.bold(' LOW ');
+    case Severity.Info:
+      return chalk.bgGray.black.bold(' INFO ');
+  }
+}
+
 /**
  * Get confidence label
  */
-function getConfidenceLabel(confidence: Confidence): string {
+function getConfidenceBadge(confidence: Confidence): string {
   switch (confidence) {
     case Confidence.High:
-      return 'high confidence';
+      return chalk.bgGreen.black.bold(' HIGH CONFIDENCE ');
     case Confidence.Medium:
-      return 'medium confidence';
+      return chalk.bgYellow.black.bold(' MEDIUM CONFIDENCE ');
     case Confidence.Low:
-      return 'low confidence';
+      return chalk.bgMagenta.black.bold(' LOW CONFIDENCE ');
   }
+}
+
+function getFileGroup(location?: string): string {
+  if (!location) {
+    return 'project-wide';
+  }
+
+  const withLineOrColumn = location.match(/^(.*?):\d+(?::\d+)?$/);
+  if (withLineOrColumn?.[1]) {
+    return withLineOrColumn[1];
+  }
+
+  return location;
+}
+
+function summarizeBySeverity(findings: Finding[]): Map<Severity, number> {
+  const counts = new Map<Severity, number>();
+  for (const severity of SEVERITY_ORDER) {
+    counts.set(severity, 0);
+  }
+
+  for (const finding of findings) {
+    counts.set(finding.severity, (counts.get(finding.severity) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+function renderStackedSummaryBar(counts: Map<Severity, number>, total: number, width = 28): string {
+  if (total === 0) {
+    return chalk.gray('░'.repeat(width));
+  }
+
+  const blocks: string[] = [];
+  let filled = 0;
+  let running = 0;
+
+  for (const severity of SEVERITY_ORDER) {
+    running += counts.get(severity) ?? 0;
+    const shouldFill = Math.round((running / total) * width);
+    const segmentLength = Math.max(0, shouldFill - filled);
+
+    if (segmentLength > 0) {
+      const color = getSeverityColor(severity);
+      blocks.push(color('█'.repeat(segmentLength)));
+      filled += segmentLength;
+    }
+  }
+
+  if (filled < width) {
+    blocks.push(chalk.gray('░'.repeat(width - filled)));
+  }
+
+  return blocks.join('');
+}
+
+function formatMultilineBlock(content: string, prefix: string): string[] {
+  return content
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .map((line) => `${prefix}${line}`);
 }
 
 /**
  * Format a single finding
  */
-async function formatFinding(finding: Finding, index: number): Promise<string> {
-  const c = await getChalk();
+function formatFinding(finding: Finding, index: number): string {
   const severityColor = getSeverityColor(finding.severity);
-  
+
   const lines: string[] = [];
-  
-  // Header
+  const findingNumber = `${index + 1}`.padStart(2, '0');
+
   lines.push(
-    `${c.bold(`${index + 1}.`)} ${severityColor(`[${finding.severity.toUpperCase()}]`)} ${c.bold(finding.title)}`
+    severityColor(`┌─ ${chalk.bold(`#${findingNumber}`)} ${getSeverityBadge(finding.severity)} ${chalk.whiteBright.bold(finding.title)}`)
   );
-  
-  // Location and guideline
-  const meta: string[] = [];
-  if (finding.location) {
-    meta.push(`📍 ${finding.location}`);
-  }
-  meta.push(`🧩 Rule ${finding.ruleId}`);
-  meta.push(`📋 Guideline ${finding.guideline}`);
-  meta.push(`🎯 ${getConfidenceLabel(finding.confidence)}`);
-  lines.push(c.dim(`   ${meta.join(' • ')}`));
-  
-  // Description
-  lines.push('');
-  lines.push(c.white(`   ${finding.description}`));
-  
-  // Fix guidance
-  lines.push('');
-  lines.push(c.green.bold('   How to fix:'));
+
+  const locationLabel = finding.location ? chalk.cyan(finding.location) : chalk.dim('project-wide');
+  lines.push(`│  ${chalk.dim('Location:')} ${locationLabel}`);
+  lines.push(`│  ${chalk.dim('Rule:')} ${chalk.bold(finding.ruleId)}  ${chalk.dim('Guideline:')} ${chalk.bold(finding.guideline)}`);
+  lines.push(`│  ${chalk.dim('Signal:')} ${getConfidenceBadge(finding.confidence)}`);
+
+  lines.push(`│`);
+  lines.push(`│  ${chalk.dim.bold('Description')}`);
+  lines.push(...formatMultilineBlock(finding.description, `│    `));
+
+  lines.push(`│`);
+  lines.push(`│  ${chalk.greenBright.bold('How to fix')}`);
   for (const line of finding.fixGuidance.split('\n')) {
-    lines.push(c.green(`   ${line}`));
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      lines.push('│');
+      continue;
+    }
+
+    const bulletLine = trimmed.startsWith('-') || trimmed.startsWith('•')
+      ? trimmed.replace(/^[-•]\s*/, '• ')
+      : `• ${trimmed}`;
+
+    lines.push(`│   ${chalk.green(bulletLine)}`);
   }
-  
-  // Documentation URL
+
   if (finding.documentationURL) {
-    lines.push('');
-    lines.push(c.cyan(`   📚 ${finding.documentationURL}`));
+    lines.push(`│`);
+    lines.push(`│  ${chalk.cyanBright('Docs:')} ${chalk.underline.cyan(finding.documentationURL)}`);
   }
-  
+
+  lines.push(severityColor('└─'));
+
   return lines.join('\n');
 }
 
@@ -97,56 +200,95 @@ async function formatFinding(finding: Finding, index: number): Promise<string> {
 export async function formatText(result: ScanResult): Promise<string> {
   const c = await getChalk();
   const lines: string[] = [];
-  
+
   // Header
-  lines.push(c.bold.underline('\n🛡️  ShipLint Scan Results\n'));
-  lines.push(`📁 Project: ${result.projectPath}`);
-  lines.push(`🕐 Scanned: ${result.timestamp.toISOString()}`);
-  lines.push(`⏱️  Duration: ${result.duration}ms`);
-  lines.push(`📊 Rules run: ${result.rulesRun.length}`);
   lines.push('');
-  
-  if (result.findings.length === 0) {
-    lines.push(c.green.bold('✅ No issues found! Your app looks ready for review.'));
+  lines.push(c.bold.cyanBright('┏━ ShipLint ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+  lines.push(c.dim('   Catch App Store rejections before they happen'));
+  lines.push(c.bold.cyanBright('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+  lines.push('');
+
+  lines.push(`${c.dim('Project')}   ${c.bold(result.projectPath)}`);
+  lines.push(`${c.dim('Scanned')}   ${result.timestamp.toISOString()}`);
+  lines.push(`${c.dim('Duration')}  ${result.duration}ms`);
+  lines.push(`${c.dim('Rules')}    ${result.rulesRun.length}`);
+  lines.push('');
+
+  const counts = summarizeBySeverity(result.findings);
+  const total = result.findings.length;
+
+  lines.push(c.bold('Summary'));
+  lines.push(`  ${renderStackedSummaryBar(counts, total)} ${c.bold(String(total))} finding${total === 1 ? '' : 's'}`);
+
+  for (const severity of SEVERITY_ORDER) {
+    const count = counts.get(severity) ?? 0;
+    if (count === 0) {
+      continue;
+    }
+
+    lines.push(`  ${getSeverityBadge(severity)} ${count}`);
+  }
+
+  if (total === 0) {
+    lines.push('');
+    lines.push(c.bgGreen.black.bold(' PASS ') + c.greenBright(' No issues found. Your app looks ready for review.'));
     lines.push('');
     return lines.join('\n');
   }
-  
-  // Summary by severity
-  const bySeverity = new Map<Severity, Finding[]>();
-  for (const finding of result.findings) {
-    const existing = bySeverity.get(finding.severity) ?? [];
+
+  lines.push('');
+  lines.push(c.bold('Findings'));
+
+  // Sort findings by severity, then by file group, then rule id
+  const sortedFindings = [...result.findings].sort((a, b) => {
+    const severityDelta = getSeverityRank(a.severity) - getSeverityRank(b.severity);
+    if (severityDelta !== 0) {
+      return severityDelta;
+    }
+
+    const fileA = getFileGroup(a.location);
+    const fileB = getFileGroup(b.location);
+    const fileDelta = fileA.localeCompare(fileB);
+    if (fileDelta !== 0) {
+      return fileDelta;
+    }
+
+    return a.ruleId.localeCompare(b.ruleId);
+  });
+
+  const grouped = new Map<string, Finding[]>();
+  for (const finding of sortedFindings) {
+    const key = getFileGroup(finding.location);
+    const existing = grouped.get(key) ?? [];
     existing.push(finding);
-    bySeverity.set(finding.severity, existing);
+    grouped.set(key, existing);
   }
-  
-  lines.push(c.bold('📊 Summary:'));
-  const severityOrder = [Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info];
-  for (const severity of severityOrder) {
-    const count = bySeverity.get(severity)?.length ?? 0;
-    if (count > 0) {
-      const color = getSeverityColor(severity);
-      lines.push(`   ${color(`${severity.toUpperCase()}`)}: ${count}`);
+
+  let findingIndex = 0;
+  for (const [fileGroup, findings] of grouped) {
+    lines.push('');
+    lines.push(c.bold.cyan(`▸ ${fileGroup}`));
+
+    for (const finding of findings) {
+      lines.push(formatFinding(finding, findingIndex));
+      lines.push('');
+      findingIndex += 1;
     }
   }
-  lines.push('');
-  
-  // Findings
-  lines.push(c.bold.underline(`\n🔍 Found ${result.findings.length} issue(s):\n`));
-  
-  // Sort by severity
-  const sortedFindings = [...result.findings].sort((a, b) => {
-    const order = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
-    return order[a.severity] - order[b.severity];
-  });
-  
-  for (let i = 0; i < sortedFindings.length; i++) {
-    const formattedFinding = await formatFinding(sortedFindings[i], i);
-    lines.push(formattedFinding);
-    lines.push('');
-    lines.push(c.dim('   ' + '─'.repeat(60)));
-    lines.push('');
+
+  const criticalCount = counts.get(Severity.Critical) ?? 0;
+  const highCount = counts.get(Severity.High) ?? 0;
+  const blocksRelease = criticalCount + highCount > 0;
+
+  lines.push(c.dim('─'.repeat(68)));
+  if (blocksRelease) {
+    lines.push(c.bgRed.white.bold(' FAIL ') + c.redBright(` ${criticalCount + highCount} blocking issue(s) (critical/high).`));
+  } else {
+    lines.push(c.bgYellow.black.bold(' WARN ') + c.yellowBright(' Issues found, but none are critical/high.'));
   }
-  
+
+  lines.push(c.dim('Tip: run with --format json for CI-friendly output.'));
+  lines.push('');
+
   return lines.join('\n');
 }
