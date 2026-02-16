@@ -1,0 +1,87 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Nav from '../../../components/Nav.astro';
+import Footer from '../../../components/Footer.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const allPosts = await getCollection('blog', ({ data }) => !data.draft);
+  const allTags = [...new Set(allPosts.flatMap(post => post.data.tags))];
+  
+  return allTags.map(tag => ({
+    params: { tag: tag.toLowerCase().replace(/\s+/g, '-') },
+    props: {
+      tag,
+      posts: allPosts
+        .filter(post => post.data.tags.includes(tag))
+        .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()),
+    },
+  }));
+}
+
+const { tag, posts } = Astro.props;
+const allPosts = await getCollection('blog', ({ data }) => !data.draft);
+const allTags = [...new Set(allPosts.flatMap(post => post.data.tags))].sort();
+---
+
+<BaseLayout
+  title={`${tag} — ShipLint Blog`}
+  description={`Blog posts tagged "${tag}" on ShipLint.`}
+>
+  <Nav showSections={false} />
+
+  <main id="main" class="pt-16">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+      <nav aria-label="Breadcrumb" class="mb-8 text-sm text-muted">
+        <a href="/" class="hover:text-accent transition-colors">ShipLint</a>
+        <span class="mx-2">›</span>
+        <a href="/blog/" class="hover:text-accent transition-colors">Blog</a>
+        <span class="mx-2">›</span>
+        <span class="text-white">{tag}</span>
+      </nav>
+
+      <header class="mb-12">
+        <h1 class="text-3xl font-bold text-white mb-2">Posts tagged: <span class="gradient-text">{tag}</span></h1>
+        <p class="text-muted">{posts.length} post{posts.length !== 1 ? 's' : ''}</p>
+      </header>
+
+      <!-- Tag filters -->
+      <div class="mb-10 flex flex-wrap gap-2">
+        <a href="/blog/" class="text-xs font-medium bg-surface-700 text-muted px-3 py-1.5 rounded-full hover:bg-surface-600 hover:text-white transition-colors">All</a>
+        {allTags.map(t => (
+          <a
+            href={`/blog/tag/${t.toLowerCase().replace(/\s+/g, '-')}/`}
+            class={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${t === tag ? 'bg-accent/20 text-accent' : 'bg-surface-700 text-muted hover:bg-surface-600 hover:text-white'}`}
+          >
+            {t}
+          </a>
+        ))}
+      </div>
+
+      <div class="space-y-8">
+        {posts.map(post => (
+          <a href={`/blog/${post.id}/`} class="block group">
+            <article class="bg-surface-800 border border-surface-600 rounded-xl p-6 md:p-8 hover:border-accent/50 transition-all hover:bg-surface-700/50">
+              <div class="flex flex-wrap gap-2 mb-3">
+                {post.data.tags.map((t: string) => (
+                  <span class={`text-xs font-medium px-2 py-0.5 rounded-full ${t === tag ? 'bg-accent/20 text-accent' : 'bg-accent/10 text-accent'}`}>{t}</span>
+                ))}
+              </div>
+              <h2 class="text-xl font-bold text-white mb-2 group-hover:text-accent transition-colors">{post.data.title}</h2>
+              <p class="text-gray-300 leading-relaxed mb-3">{post.data.description}</p>
+              <div class="flex items-center gap-4 text-sm text-muted">
+                <time datetime={post.data.pubDate.toISOString()}>
+                  {post.data.pubDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </time>
+                {post.data.readingTime && <span>· {post.data.readingTime}</span>}
+              </div>
+            </article>
+          </a>
+        ))}
+      </div>
+    </div>
+  </main>
+
+  <Footer />
+</BaseLayout>
