@@ -144,11 +144,26 @@ function boxify(content: string, maxWidth = 70): string[] {
     return [];
   }
 
-  const lines = rawLines.map((line) => truncate(line, maxWidth));
-  const width = Math.max(...lines.map((line) => line.length), 1);
+  // Wrap long lines instead of truncating
+  const wrappedLines: string[] = [];
+  for (const line of rawLines) {
+    if (line.length <= maxWidth) {
+      wrappedLines.push(line);
+    } else if (line.trimStart().startsWith('<')) {
+      // XML/code lines: don't word-wrap, just allow full width
+      wrappedLines.push(line);
+    } else {
+      // Word-wrap prose lines
+      for (const wl of wrapText(line, maxWidth)) {
+        wrappedLines.push(wl);
+      }
+    }
+  }
+
+  const width = Math.max(...wrappedLines.map((line) => line.length), maxWidth);
 
   const top = `┌${'─'.repeat(width + 2)}┐`;
-  const middle = lines.map((line) => `│ ${line.padEnd(width, ' ')} │`);
+  const middle = wrappedLines.map((line) => `│ ${line.padEnd(width, ' ')} │`);
   const bottom = `└${'─'.repeat(width + 2)}┘`;
 
   return [top, ...middle, bottom];
