@@ -102,8 +102,7 @@ function firstSentence(text: string): string {
 function shortExplanation(finding: Finding): string {
   const sentence = firstSentence(finding.description);
   const fallback = finding.description.replace(/\s+/g, ' ').trim();
-  const candidate = sentence || fallback || 'Needs attention before submission.';
-  return truncate(candidate, 80);
+  return sentence || fallback || 'Needs attention before submission.';
 }
 
 function wrapText(text: string, width: number): string[] {
