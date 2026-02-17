@@ -51,7 +51,7 @@ function makeResult(findings: Finding[]): ScanResult {
 }
 
 describe('CLI output redesign', () => {
-  test('default text formatter shows compact header, passed checks, findings, and summary', async () => {
+  test('default text formatter shows compact header, findings and summary', async () => {
     const output = await formatText(
       makeResult([
         makeFinding(),
@@ -68,14 +68,14 @@ describe('CLI output redesign', () => {
     );
 
     expect(output).toContain('ShipLint v1.5.0 — scanning VibeApp.xcodeproj');
-    expect(output).toContain('✓ Camera usage description present');
+    // passing checks removed from default output
 
     expect(output).toContain('✖ Missing PrivacyInfo.xcprivacy for UserDefaults API');
     expect(output).toContain('→ Apple will reject with ITMS-91053.');
     expect(output).toContain('△ ATS exception for *.example.com');
     expect(output).toContain('→ Needs written justification.');
 
-    expect(output).toContain('1 errors · 1 warnings · 1 passed');
+    expect(output).toContain('1 error · 1 warning');
     expect(output).toContain('Fix errors before submitting to App Store Connect.');
 
     expect(output).not.toContain('description:');
@@ -84,11 +84,11 @@ describe('CLI output redesign', () => {
     expect(output).not.toContain('──');
     expect(output).not.toContain('Suggested fix:');
 
-    const passedIndex = output.indexOf('✓ Camera usage description present');
+    // const passedIndex = output.indexOf('✓ Camera usage description present');
     const findingIndex = output.indexOf('✖ Missing PrivacyInfo.xcprivacy for UserDefaults API');
-    expect(passedIndex).toBeGreaterThan(-1);
+    // expect(passedIndex).toBeGreaterThan(-1);
     expect(findingIndex).toBeGreaterThan(-1);
-    expect(passedIndex).toBeLessThan(findingIndex);
+    // expect(passedIndex).toBeLessThan(findingIndex);
   });
 
   test('verbose mode expands each finding with full context and boxed guidance', async () => {

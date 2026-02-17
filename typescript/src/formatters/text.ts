@@ -257,13 +257,7 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
   lines.push(`ShipLint v${version} — scanning ${displayProjectName(result.projectPath)}`);
   lines.push('');
 
-  for (const ruleId of passedRuleIds) {
-    lines.push(`  ${c.green(`✓ ${passedLabel(ruleId)}`)}`);
-  }
 
-  if (passedRuleIds.length > 0 && sortedFindings.length > 0) {
-    lines.push('');
-  }
 
   for (let i = 0; i < sortedFindings.length; i++) {
     const finding = sortedFindings[i];
@@ -273,13 +267,15 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
     }
   }
 
-  if (passedRuleIds.length > 0 || sortedFindings.length > 0) {
+  if (sortedFindings.length > 0) {
     lines.push('');
   }
 
-  lines.push(
-    `${c.red(`${errorCount} errors`)} · ${c.yellow(`${warningCount} warnings`)} · ${c.green(`${passedCount} passed`)}`
-  );
+  const parts: string[] = [];
+  if (errorCount > 0) parts.push(c.red(`${errorCount} error${errorCount === 1 ? '' : 's'}`));
+  if (warningCount > 0) parts.push(c.yellow(`${warningCount} warning${warningCount === 1 ? '' : 's'}`));
+  if (parts.length === 0) parts.push(c.green('No issues found'));
+  lines.push(parts.join(' \u00b7 '));
 
   if (errorCount > 0) {
     lines.push('Fix errors before submitting to App Store Connect.');
