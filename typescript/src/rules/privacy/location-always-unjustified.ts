@@ -22,7 +22,7 @@ export const LocationAlwaysUnjustifiedRule: Rule = {
   name: 'Location Always Permission Without Justification',
   description: 'Checks for Always location permission without background mode or proper justification',
   category: RuleCategory.Privacy,
-  severity: Severity.Critical,
+  severity: Severity.High,
   confidence: Confidence.Medium,
   guidelineReference: '5.1.1',
 

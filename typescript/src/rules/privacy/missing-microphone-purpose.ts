@@ -88,8 +88,10 @@ Note: You'll also need NSMicrophoneUsageDescription since speech recognition req
     }
 
     // When only AVFoundation is detected (no AVFAudio/Speech), use Medium confidence
-    // since AVFoundation is commonly used for audio/video playback, not just recording
+    // since AVFoundation is commonly used for audio/video playback, not just recording.
+    // Medium-confidence findings are HIGH severity (likely issue), not CRITICAL (guaranteed blocker).
     const confidenceLevel = hasOnlyAVFoundation ? Confidence.Medium : Confidence.High;
+    const findingSeverity = hasOnlyAVFoundation ? Severity.High : this.severity;
     const avFoundationCaveat = hasOnlyAVFoundation 
       ? `\n\nNote: AVFoundation is commonly used for audio/video playback. If your app only plays ` +
         `media and doesn't record audio, you may not need this permission.`
@@ -97,7 +99,7 @@ Note: You'll also need NSMicrophoneUsageDescription since speech recognition req
 
     // Case 1: Completely missing microphone description
     if (microphoneDescription === undefined) {
-      findings.push(makeCustomFinding(this, this.severity, confidenceLevel, {
+      findings.push(makeCustomFinding(this, findingSeverity, confidenceLevel, {
         title: 'Missing Microphone Usage Description',
         description: `Your app links against audio frameworks (${frameworksToReport.join(', ')}) ` +
           `but Info.plist is missing NSMicrophoneUsageDescription. Apps that access the microphone ` +
@@ -115,7 +117,7 @@ The description should explain the specific feature that uses the microphone.`,
     }
     // Case 2: Empty description
     else if (microphoneDescription.trim() === '') {
-      findings.push(makeCustomFinding(this, this.severity, confidenceLevel, {
+      findings.push(makeCustomFinding(this, findingSeverity, confidenceLevel, {
         title: 'Empty Microphone Usage Description',
         description: `NSMicrophoneUsageDescription exists in Info.plist but is empty. ` +
           `Apple requires a meaningful description explaining why your app needs microphone access.${avFoundationCaveat}`,
@@ -130,7 +132,7 @@ Bad example: "Microphone access required" or ""`,
     }
     // Case 3: Placeholder text detected
     else if (isPlaceholder(microphoneDescription)) {
-      findings.push(makeCustomFinding(this, this.severity, confidenceLevel, {
+      findings.push(makeCustomFinding(this, findingSeverity, confidenceLevel, {
         title: 'Placeholder Microphone Usage Description',
         description: `NSMicrophoneUsageDescription appears to contain placeholder text: "${microphoneDescription}". ` +
           `Apple requires meaningful, user-facing descriptions.${avFoundationCaveat}`,
