@@ -117,3 +117,76 @@ describe('CLI output redesign', () => {
     );
   });
 });
+
+describe('inline fix hints for critical findings', () => {
+  test('critical findings show a Fix: line in default mode', async () => {
+    const output = await formatText(
+      makeResult([
+        makeFinding({
+          severity: Severity.Critical,
+          title: 'Missing Camera Usage Description',
+          description: 'Camera framework used without NSCameraUsageDescription.',
+          fixGuidance:
+            'Add NSCameraUsageDescription to your Info.plist with a clear, user-facing explanation of why your app needs camera access.',
+        }),
+      ]),
+      { version: '1.5.0' }
+    );
+
+    expect(output).toMatch(/Fix: Add NSCameraUsageDescription to your Info.plist/);
+  });
+
+  test('non-critical findings do NOT show a Fix: line', async () => {
+    const output = await formatText(
+      makeResult([
+        makeFinding({
+          severity: Severity.Medium,
+          title: 'ATS exception for *.example.com',
+          description: 'Needs written justification.',
+          fixGuidance: 'Document why ATS must be relaxed for this domain.',
+        }),
+      ]),
+      { version: '1.5.0' }
+    );
+
+    expect(output).not.toContain('Fix:');
+  });
+
+  test('verbose mode does NOT show inline Fix: line (uses boxed guidance instead)', async () => {
+    const output = await formatText(
+      makeResult([
+        makeFinding({
+          severity: Severity.Critical,
+          title: 'Missing Camera Usage Description',
+          description: 'Camera framework used without NSCameraUsageDescription.',
+          fixGuidance: 'Add NSCameraUsageDescription to your Info.plist.',
+        }),
+      ]),
+      { verbose: true, version: '1.5.0' }
+    );
+
+    // verbose shows the full "Suggested fix:" box, not the inline Fix: line
+    expect(output).toContain('Suggested fix:');
+    expect(output).not.toMatch(/^\s+Fix:/m);
+  });
+});
+
+describe('verbose nudge footer', () => {
+  test('shows verbose nudge when there are findings', async () => {
+    const output = await formatText(
+      makeResult([makeFinding()]),
+      { version: '1.5.0' }
+    );
+
+    expect(output).toContain('Run shiplint scan --verbose for details');
+  });
+
+  test('does NOT show verbose nudge when there are no findings', async () => {
+    const output = await formatText(
+      makeResult([]),
+      { version: '1.5.0' }
+    );
+
+    expect(output).not.toContain('Run shiplint scan --verbose for details');
+  });
+});

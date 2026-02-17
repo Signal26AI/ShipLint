@@ -105,6 +105,15 @@ function shortExplanation(finding: Finding): string {
   return sentence || fallback || 'Needs attention before submission.';
 }
 
+
+function shortFix(fixGuidance: string): string {
+  if (!fixGuidance?.trim()) return '';
+  // Take first line, extract first sentence, cap length
+  const first = fixGuidance.split('\n')[0].replace(/\s+/g, ' ').trim();
+  const sentence = firstSentence(first);
+  return truncate(sentence || first, 120);
+}
+
 function wrapText(text: string, width: number): string[] {
   const paragraphs = text
     .split(/\n\s*\n/)
@@ -220,6 +229,9 @@ async function formatFinding(finding: Finding, verbose: boolean): Promise<string
   lines.push(`    ${color(`→ ${shortExplanation(finding)}`)}`);
 
   if (!verbose) {
+    if (finding.severity === Severity.Critical && finding.fixGuidance?.trim()) {
+      lines.push(`    ${c.cyan(`Fix: ${shortFix(finding.fixGuidance)}`)}`);
+    }
     return lines;
   }
 
@@ -295,7 +307,8 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
   if (parts.length === 0) parts.push(c.green('No issues found'));
   lines.push(parts.join(' \u00b7 '));
 
-  if (errorCount > 0) {
+  if (sortedFindings.length > 0) {
+    lines.push(c.dim('  Run shiplint scan --verbose for details'));
   }
 
   return lines.join('\n');
