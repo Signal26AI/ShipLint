@@ -1,8 +1,7 @@
 /**
  * Text formatter for human-readable output
- * v1.5: Rust-style diagnostics + verdict banner + severity grouping
+ * v3: clean, width-aware CLI diagnostics
  */
-import * as fs from 'fs';
 import * as path from 'path';
 import type { ScanResult, Finding } from '../types/index.js';
 import { Severity } from '../types/index.js';
@@ -19,24 +18,6 @@ async function getChalk() {
 }
 
 /**
- * Get severity color
- */
-function getSeverityColor(severity: Severity): (text: string) => string {
-  switch (severity) {
-    case Severity.Critical:
-      return (text) => chalk.red.bold(text);
-    case Severity.High:
-      return (text) => chalk.red(text);
-    case Severity.Medium:
-      return (text) => chalk.yellow(text);
-    case Severity.Low:
-      return (text) => chalk.blue(text);
-    case Severity.Info:
-      return (text) => chalk.gray(text);
-  }
-}
-
-/**
  * Severity sort order
  */
 const SEVERITY_ORDER: Record<string, number> = {
@@ -47,61 +28,12 @@ const SEVERITY_ORDER: Record<string, number> = {
   info: 4,
 };
 
-const SOURCE_CACHE = new Map<string, string[]>();
-
-function isReadableFile(filePath: string): boolean {
-  try {
-    return fs.statSync(filePath).isFile();
-  } catch {
-    return false;
-  }
+function getTerminalWidth(): number {
+  return Math.min(process.stdout.columns || 80, 100);
 }
 
-function resolveLocationPath(projectPath: string, location: string): string | undefined {
-  if (path.isAbsolute(location) && isReadableFile(location)) {
-    return location;
-  }
-
-  const candidates = [
-    path.resolve(projectPath, location),
-    path.resolve(process.cwd(), location),
-  ];
-
-  for (const candidate of candidates) {
-    if (isReadableFile(candidate)) {
-      return candidate;
-    }
-  }
-
-  return undefined;
-}
-
-function getSourceLines(filePath: string): string[] | undefined {
-  if (SOURCE_CACHE.has(filePath)) {
-    return SOURCE_CACHE.get(filePath);
-  }
-
-  try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const lines = content.split(/\r?\n/);
-    SOURCE_CACHE.set(filePath, lines);
-    return lines;
-  } catch {
-    return undefined;
-  }
-}
-
-function getCaretColumn(lineText: string): number {
-  const firstNonWhitespace = lineText.search(/\S/);
-  if (firstNonWhitespace === -1) return 1;
-  return firstNonWhitespace + 1;
-}
-
-function getCaretLength(lineText: string): number {
-  const trimmed = lineText.trimStart();
-  if (!trimmed) return 1;
-  const firstToken = trimmed.split(/\s+/)[0] || '';
-  return Math.max(1, Math.min(24, firstToken.length));
+function separator(char: string, width: number): string {
+  return char.repeat(width);
 }
 
 function displayPath(projectPath: string, location: string): string {
@@ -125,79 +57,172 @@ function inferCheckedFileCount(result: ScanResult): number {
   return Math.max(locations.size, 1);
 }
 
-function getTerminalWidth(): number {
-  return Math.min(process.stdout.columns || 80, 100);
+/**
+ * Word-wrap text to terminal width with indentation.
+ */
+function wrapText(text: string, width: number, indent: number): string {
+  const normalized = text.replace(/\r\n/g, '\n');
+  const indentStr = ' '.repeat(Math.max(0, indent));
+  const maxContentWidth = Math.max(10, width - indentStr.length);
+  const output: string[] = [];
+
+  for (const rawLine of normalized.split('\n')) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      output.push('');
+      continue;
+    }
+
+    let current = '';
+    const words = line.split(/\s+/);
+
+    for (const word of words) {
+      if (word.length > maxContentWidth) {
+        if (current) {
+          output.push(`${indentStr}${current}`);
+          current = '';
+        }
+
+        let remainder = word;
+        while (remainder.length > maxContentWidth) {
+          output.push(`${indentStr}${remainder.slice(0, maxContentWidth)}`);
+          remainder = remainder.slice(maxContentWidth);
+        }
+
+        current = remainder;
+        continue;
+      }
+
+      const candidate = current ? `${current} ${word}` : word;
+      if (candidate.length <= maxContentWidth) {
+        current = candidate;
+      } else {
+        output.push(`${indentStr}${current}`);
+        current = word;
+      }
+    }
+
+    if (current) {
+      output.push(`${indentStr}${current}`);
+    }
+  }
+
+  return output.join('\n');
 }
 
-function separator(char: string): string {
-  return char.repeat(getTerminalWidth());
+function getSeverityColor(c: typeof import('chalk').default, severity: Severity): (text: string) => string {
+  switch (severity) {
+    case Severity.Critical:
+      return (text) => c.red.bold(text);
+    case Severity.High:
+      return (text) => c.red(text);
+    case Severity.Medium:
+      return (text) => c.yellow(text);
+    case Severity.Low:
+      return (text) => c.blue(text);
+    case Severity.Info:
+      return (text) => c.gray(text);
+  }
 }
 
-async function formatFinding(finding: Finding, projectPath: string): Promise<string> {
+function getSeverityIcon(severity: Severity): string {
+  switch (severity) {
+    case Severity.Critical:
+      return '✖';
+    case Severity.High:
+    case Severity.Medium:
+      return '⚠';
+    case Severity.Low:
+    case Severity.Info:
+      return 'ℹ';
+  }
+}
+
+function formatSeverityHeader(severity: Severity, count: number, width: number): string {
+  const label = `── ${severity.toUpperCase()} (${count}) `;
+  const fill = Math.max(0, width - label.length);
+  return `${label}${'─'.repeat(fill)}`;
+}
+
+function pushWrapped(
+  lines: string[],
+  text: string,
+  width: number,
+  indent: number,
+  style?: (value: string) => string
+): void {
+  const wrapped = wrapText(text, width, indent).split('\n');
+  for (const line of wrapped) {
+    lines.push(style ? style(line) : line);
+  }
+}
+
+function formatFixGuidance(fixGuidance: string, width: number): string[] {
+  const lines: string[] = [];
+  const rawLines = fixGuidance.replace(/\r\n/g, '\n').split('\n');
+  const introIndex = rawLines.findIndex((line) => line.trim().length > 0);
+
+  if (introIndex === -1) return lines;
+
+  const intro = rawLines[introIndex].trim();
+  lines.push(...wrapText(`Fix: ${intro}`, width, 4).split('\n'));
+
+  const details = rawLines.slice(introIndex + 1);
+  if (!details.some((line) => line.trim().length > 0)) {
+    return lines;
+  }
+
+  lines.push('');
+
+  let previousBlank = false;
+  for (const detail of details) {
+    const trimmed = detail.trim();
+
+    if (!trimmed) {
+      if (!previousBlank) {
+        lines.push('');
+      }
+      previousBlank = true;
+      continue;
+    }
+
+    previousBlank = false;
+    lines.push(...wrapText(trimmed, width, 6).split('\n'));
+  }
+
+  return lines;
+}
+
+async function formatFinding(finding: Finding, projectPath: string, width: number): Promise<string> {
   const c = await getChalk();
-  const severityColor = getSeverityColor(finding.severity);
-  const severityLabel = finding.severity.toUpperCase();
   const lines: string[] = [];
 
-  if (finding.location && finding.line) {
-    const sourcePath = resolveLocationPath(projectPath, finding.location);
-    const shownPath = displayPath(projectPath, finding.location);
+  pushWrapped(lines, `${getSeverityIcon(finding.severity)} ${finding.title}`, width, 2, c.bold);
 
-    let column = 1;
-    let caretLength = 1;
-    let sourceLines: string[] | undefined;
+  const location = finding.location
+    ? `${displayPath(projectPath, finding.location)}${finding.line ? `:${finding.line}` : ''}`
+    : undefined;
 
-    if (sourcePath) {
-      sourceLines = getSourceLines(sourcePath);
-      const lineText = sourceLines?.[finding.line - 1] ?? '';
-      column = getCaretColumn(lineText);
-      caretLength = getCaretLength(lineText);
-    }
+  const metadataParts = [finding.ruleId, finding.severity.toUpperCase()];
+  if (location) {
+    metadataParts.push(location);
+  }
+  pushWrapped(lines, metadataParts.join(' · '), width, 4, c.dim);
 
-    lines.push(
-      `${c.bold(`${shownPath}:${finding.line}:${column}:`)} ${finding.ruleId} ${severityColor(`[${severityLabel}]`)} ${c.bold(finding.title)}`
-    );
-
-    if (sourceLines && sourceLines[finding.line - 1] !== undefined) {
-      const startLine = Math.max(1, finding.line - 1);
-      const endLine = Math.min(sourceLines.length, finding.line + 1);
-
-      lines.push('  |');
-      for (let lineNumber = startLine; lineNumber <= endLine; lineNumber++) {
-        const text = sourceLines[lineNumber - 1] ?? '';
-        lines.push(`${String(lineNumber).padStart(3, ' ')} | ${text}`);
-        if (lineNumber === finding.line) {
-          lines.push(`    | ${' '.repeat(Math.max(0, column - 1))}${'^'.repeat(caretLength)} ${finding.ruleId}`);
-        }
-      }
-      lines.push('  |');
-    } else {
-      lines.push('  |');
-      lines.push(`  = location: ${shownPath}`);
-      lines.push('  |');
-    }
-
-    const helpLines = finding.fixGuidance.split('\n').filter(Boolean);
-    for (const help of helpLines) {
-      lines.push(c.green(`  = help: ${help}`));
-    }
-    if (finding.documentationURL) {
-      lines.push(c.cyan(`  = docs: ${finding.documentationURL}`));
-    }
-
-    return lines.join('\n');
+  if (finding.description.trim().length > 0) {
+    lines.push('');
+    lines.push(...wrapText(finding.description, width, 4).split('\n'));
   }
 
-  lines.push(`${finding.ruleId} ${severityColor(`[${severityLabel}]`)} ${c.bold(finding.title)}`);
-  if (finding.location) {
-    lines.push(c.dim(`  location: ${displayPath(projectPath, finding.location)}`));
+  if (finding.fixGuidance.trim().length > 0) {
+    lines.push('');
+    lines.push(...formatFixGuidance(finding.fixGuidance, width));
   }
-  lines.push(`  description: ${finding.description}`);
-  for (const help of finding.fixGuidance.split('\n').filter(Boolean)) {
-    lines.push(c.green(`  help: ${help}`));
-  }
+
   if (finding.documentationURL) {
-    lines.push(c.cyan(`  docs: ${finding.documentationURL}`));
+    lines.push('');
+    pushWrapped(lines, `→ ${finding.documentationURL}`, width, 4, c.dim);
   }
 
   return lines.join('\n');
@@ -208,13 +233,17 @@ async function formatFinding(finding: Finding, projectPath: string): Promise<str
  */
 export async function formatText(result: ScanResult): Promise<string> {
   const c = await getChalk();
+  const width = getTerminalWidth();
   const lines: string[] = [];
+
   const suppressedCount = result.suppressedFindings?.length ?? 0;
   const suppressedSuffix = suppressedCount > 0 ? ` (${suppressedCount} suppressed)` : '';
 
   // Header
-  lines.push(c.bold.underline('\n🛡️  ShipLint Scan Results\n'));
-  lines.push(`📁 Project: ${result.projectPath}`);
+  lines.push('');
+  lines.push(c.bold.underline('🛡️  ShipLint Scan Results'));
+  lines.push('');
+  pushWrapped(lines, `📁 Project: ${result.projectPath}`, width, 0);
   lines.push(`🕐 Scanned: ${result.timestamp.toISOString()}`);
   lines.push(`⏱️  Duration: ${result.duration}ms`);
   lines.push(`📊 Rules run: ${result.rulesRun.length}`);
@@ -237,21 +266,21 @@ export async function formatText(result: ScanResult): Promise<string> {
 
   // ═══ SHIP VERDICT ═══
   if (criticalCount > 0) {
-    lines.push(c.red.bold(separator('═')));
+    lines.push(c.red.bold(separator('═', width)));
     lines.push(c.red.bold(`  🚫 BLOCKED — ${criticalCount} issue(s) will cause App Store rejection${suppressedSuffix}`));
-    lines.push(c.red.bold(separator('═')));
+    lines.push(c.red.bold(separator('═', width)));
   } else if (highCount > 0) {
-    lines.push(c.yellow.bold(separator('═')));
+    lines.push(c.yellow.bold(separator('═', width)));
     lines.push(c.yellow.bold(`  ⚠️ WARNING — ${highCount} issue(s) likely to cause rejection${suppressedSuffix}`));
-    lines.push(c.yellow.bold(separator('═')));
+    lines.push(c.yellow.bold(separator('═', width)));
   } else if (result.findings.length > 0) {
-    lines.push(c.blue.bold(separator('═')));
+    lines.push(c.blue.bold(separator('═', width)));
     lines.push(c.blue.bold(`  💡 ${result.findings.length} suggestion(s) to improve your submission${suppressedSuffix}`));
-    lines.push(c.blue.bold(separator('═')));
+    lines.push(c.blue.bold(separator('═', width)));
   } else {
-    lines.push(c.green.bold(separator('═')));
+    lines.push(c.green.bold(separator('═', width)));
     lines.push(c.green.bold(`  ✅ READY — No issues found${suppressedSuffix}`));
-    lines.push(c.green.bold(separator('═')));
+    lines.push(c.green.bold(separator('═', width)));
   }
 
   const sortedFindings = [...result.findings].sort((a, b) => {
@@ -259,22 +288,20 @@ export async function formatText(result: ScanResult): Promise<string> {
   });
 
   if (sortedFindings.length > 0) {
-    lines.push('');
-
     let currentSeverity: Severity | null = null;
+
     for (const finding of sortedFindings) {
       if (finding.severity !== currentSeverity) {
         currentSeverity = finding.severity;
-        const color = getSeverityColor(currentSeverity);
         const count = bySeverity.get(currentSeverity)?.length ?? 0;
+        const color = getSeverityColor(c, currentSeverity);
+
         lines.push('');
-        lines.push(color(separator('─')));
-        lines.push(color(`  ${currentSeverity.toUpperCase()} (${count})`));
-        lines.push(color(separator('─')));
+        lines.push(color(formatSeverityHeader(currentSeverity, count, width)));
         lines.push('');
       }
 
-      lines.push(await formatFinding(finding, result.projectPath));
+      lines.push(await formatFinding(finding, result.projectPath, width));
       lines.push('');
     }
   }
@@ -284,7 +311,7 @@ export async function formatText(result: ScanResult): Promise<string> {
   const lowInfo = (bySeverity.get(Severity.Low)?.length ?? 0) + (bySeverity.get(Severity.Info)?.length ?? 0);
   const checkedFiles = inferCheckedFileCount(result);
 
-  lines.push(c.dim(separator('━')));
+  lines.push(c.dim(separator('━', width)));
   lines.push(`Checked ${checkedFiles} files in ${result.duration}ms`);
   lines.push('');
   lines.push(
