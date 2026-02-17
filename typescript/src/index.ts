@@ -28,4 +28,4 @@ export {
 export { scan, scanWithContext } from './core/scanner.js';
 
 // Formatters
-export { format, formatText, formatJSON, formatSARIF } from './formatters/index.js';
+export { format, formatText, formatJSON, formatSARIF, formatXcode } from './formatters/index.js';

@@ -24,7 +24,7 @@ program
   .command('scan')
   .description('Scan an Xcode project for potential App Store Review issues')
   .argument('<path>', 'Path to Xcode project, workspace, or directory')
-  .option('-f, --format <format>', 'Output format: text, json, sarif', 'text')
+  .option('-f, --format <format>', 'Output format: text, json, sarif, xcode', 'text')
   .option('-v, --verbose', 'Show verbose output', false)
   .option('-r, --rules <rules...>', 'Only run specific rules (by ID)')
   .option('-e, --exclude <rules...>', 'Exclude specific rules (by ID)')
@@ -128,8 +128,10 @@ function parseOutputFormat(format: string): OutputFormat {
       return OutputFormat.JSON;
     case 'sarif':
       return OutputFormat.SARIF;
+    case 'xcode':
+      return OutputFormat.Xcode;
     default:
-      throw new Error(`Unknown output format: ${format}. Use text, json, or sarif.`);
+      throw new Error(`Unknown output format: ${format}. Use text, json, sarif, or xcode.`);
   }
 }
 

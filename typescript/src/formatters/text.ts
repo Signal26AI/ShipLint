@@ -1,8 +1,9 @@
 /**
  * Text formatter for human-readable output
  */
+import { promises as fs } from 'node:fs';
 import type { ScanResult, Finding } from '../types/index.js';
-import { Severity, Confidence } from '../types/index.js';
+import { Severity } from '../types/index.js';
 
 // Dynamic import for chalk (ESM)
 let chalk: typeof import('chalk').default;
@@ -23,6 +24,13 @@ const SEVERITY_ORDER: Severity[] = [
   Severity.Info,
 ];
 
+interface ParsedLocation {
+  filePath?: string;
+  line?: number;
+  column?: number;
+  displayPath: string;
+}
+
 function getSeverityRank(severity: Severity): number {
   switch (severity) {
     case Severity.Critical:
@@ -38,64 +46,53 @@ function getSeverityRank(severity: Severity): number {
   }
 }
 
-/**
- * Get severity color
- */
-function getSeverityColor(severity: Severity): (text: string) => string {
+function getSeverityColor(c: typeof import('chalk').default, severity: Severity): (text: string) => string {
   switch (severity) {
     case Severity.Critical:
-      return (text) => chalk.redBright.bold(text);
+      return (text) => c.redBright.bold(text);
     case Severity.High:
-      return (text) => chalk.red(text);
+      return (text) => c.red(text);
     case Severity.Medium:
-      return (text) => chalk.yellow(text);
+      return (text) => c.yellow(text);
     case Severity.Low:
-      return (text) => chalk.blue(text);
+      return (text) => c.blue(text);
     case Severity.Info:
-      return (text) => chalk.gray(text);
+      return (text) => c.gray(text);
   }
 }
 
-function getSeverityBadge(severity: Severity): string {
-  switch (severity) {
-    case Severity.Critical:
-      return chalk.bgRedBright.black.bold(' CRITICAL ');
-    case Severity.High:
-      return chalk.bgRed.black.bold(' HIGH ');
-    case Severity.Medium:
-      return chalk.bgYellow.black.bold(' MEDIUM ');
-    case Severity.Low:
-      return chalk.bgBlue.black.bold(' LOW ');
-    case Severity.Info:
-      return chalk.bgGray.black.bold(' INFO ');
-  }
+function getSeverityLabel(severity: Severity): string {
+  return severity.toUpperCase();
 }
 
-/**
- * Get confidence label
- */
-function getConfidenceBadge(confidence: Confidence): string {
-  switch (confidence) {
-    case Confidence.High:
-      return chalk.bgGreen.black.bold(' HIGH CONFIDENCE ');
-    case Confidence.Medium:
-      return chalk.bgYellow.black.bold(' MEDIUM CONFIDENCE ');
-    case Confidence.Low:
-      return chalk.bgMagenta.black.bold(' LOW CONFIDENCE ');
-  }
-}
-
-function getFileGroup(location?: string): string {
+function parseLocation(location?: string): ParsedLocation {
   if (!location) {
-    return 'project-wide';
+    return { displayPath: 'project-wide' };
   }
 
-  const withLineOrColumn = location.match(/^(.*?):\d+(?::\d+)?$/);
-  if (withLineOrColumn?.[1]) {
-    return withLineOrColumn[1];
+  const withLineCol = location.match(/^(.*):(\d+):(\d+)$/);
+  if (withLineCol) {
+    return {
+      filePath: withLineCol[1],
+      line: Number.parseInt(withLineCol[2], 10),
+      column: Number.parseInt(withLineCol[3], 10),
+      displayPath: withLineCol[1],
+    };
   }
 
-  return location;
+  const withLine = location.match(/^(.*):(\d+)$/);
+  if (withLine) {
+    return {
+      filePath: withLine[1],
+      line: Number.parseInt(withLine[2], 10),
+      displayPath: withLine[1],
+    };
+  }
+
+  return {
+    filePath: location,
+    displayPath: location,
+  };
 }
 
 function summarizeBySeverity(findings: Finding[]): Map<Severity, number> {
@@ -111,87 +108,142 @@ function summarizeBySeverity(findings: Finding[]): Map<Severity, number> {
   return counts;
 }
 
-function renderStackedSummaryBar(counts: Map<Severity, number>, total: number, width = 28): string {
-  if (total === 0) {
-    return chalk.gray('░'.repeat(width));
-  }
-
-  const blocks: string[] = [];
-  let filled = 0;
-  let running = 0;
-
-  for (const severity of SEVERITY_ORDER) {
-    running += counts.get(severity) ?? 0;
-    const shouldFill = Math.round((running / total) * width);
-    const segmentLength = Math.max(0, shouldFill - filled);
-
-    if (segmentLength > 0) {
-      const color = getSeverityColor(severity);
-      blocks.push(color('█'.repeat(segmentLength)));
-      filled += segmentLength;
-    }
-  }
-
-  if (filled < width) {
-    blocks.push(chalk.gray('░'.repeat(width - filled)));
-  }
-
-  return blocks.join('');
+function getSurroundingLines(lines: string[], line: number): { start: number; end: number } {
+  const before = 1;
+  const after = 1;
+  const start = Math.max(1, line - before);
+  const end = Math.min(lines.length, line + after);
+  return { start, end };
 }
 
-function formatMultilineBlock(content: string, prefix: string): string[] {
-  return content
+function getCaretLength(lineText: string, column: number): number {
+  const startIndex = Math.max(0, Math.min(column - 1, lineText.length));
+  const fromColumn = lineText.slice(startIndex);
+  const token = fromColumn.match(/^\S+/)?.[0] ?? '';
+
+  if (token.length > 0) {
+    return Math.max(3, Math.min(token.length, 48));
+  }
+
+  return 3;
+}
+
+async function readFileLines(filePath: string, cache: Map<string, string[] | null>): Promise<string[] | null> {
+  if (cache.has(filePath)) {
+    return cache.get(filePath) ?? null;
+  }
+
+  try {
+    const content = await fs.readFile(filePath, 'utf8');
+    const lines = content.split(/\r?\n/);
+    cache.set(filePath, lines);
+    return lines;
+  } catch {
+    cache.set(filePath, null);
+    return null;
+  }
+}
+
+function formatHelpLines(helpText: string): string[] {
+  const parts = helpText
     .split('\n')
-    .map((line) => line.trimEnd())
-    .map((line) => `${prefix}${line}`);
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (parts.length === 0) {
+    return [];
+  }
+
+  const [first, ...rest] = parts;
+  return [`  = help: ${first}`, ...rest.map((line) => `          ${line}`)];
 }
 
-/**
- * Format a single finding
- */
-function formatFinding(finding: Finding, index: number): string {
-  const severityColor = getSeverityColor(finding.severity);
+async function formatFinding(
+  c: typeof import('chalk').default,
+  finding: Finding,
+  fileCache: Map<string, string[] | null>,
+): Promise<string> {
+  const severityColor = getSeverityColor(c, finding.severity);
+  const parsedLocation = parseLocation(finding.location);
+  const severityLabel = getSeverityLabel(finding.severity);
+
+  const locationPrefix = parsedLocation.line !== undefined
+    ? `${parsedLocation.displayPath}:${parsedLocation.line}:${parsedLocation.column ?? 1}`
+    : parsedLocation.displayPath;
 
   const lines: string[] = [];
-  const findingNumber = `${index + 1}`.padStart(2, '0');
-
   lines.push(
-    severityColor(`┌─ ${chalk.bold(`#${findingNumber}`)} ${getSeverityBadge(finding.severity)} ${chalk.whiteBright.bold(finding.title)}`)
+    `${c.bold(locationPrefix)}: ${c.bold(finding.ruleId)} ${severityColor(`[${severityLabel}]`)} ${c.whiteBright(finding.title)}`,
   );
 
-  const locationLabel = finding.location ? chalk.cyan(finding.location) : chalk.dim('project-wide');
-  lines.push(`│  ${chalk.dim('Location:')} ${locationLabel}`);
-  lines.push(`│  ${chalk.dim('Rule:')} ${chalk.bold(finding.ruleId)}  ${chalk.dim('Guideline:')} ${chalk.bold(finding.guideline)}`);
-  lines.push(`│  ${chalk.dim('Signal:')} ${getConfidenceBadge(finding.confidence)}`);
+  let renderedSource = false;
 
-  lines.push(`│`);
-  lines.push(`│  ${chalk.dim.bold('Description')}`);
-  lines.push(...formatMultilineBlock(finding.description, `│    `));
+  if (parsedLocation.filePath && parsedLocation.line !== undefined) {
+    const fileLines = await readFileLines(parsedLocation.filePath, fileCache);
 
-  lines.push(`│`);
-  lines.push(`│  ${chalk.greenBright.bold('How to fix')}`);
-  for (const line of finding.fixGuidance.split('\n')) {
-    const trimmed = line.trim();
-    if (trimmed.length === 0) {
-      lines.push('│');
-      continue;
+    if (fileLines && parsedLocation.line > 0 && parsedLocation.line <= fileLines.length) {
+      const { start, end } = getSurroundingLines(fileLines, parsedLocation.line);
+      const width = String(end).length;
+
+      lines.push('  |');
+
+      for (let lineNumber = start; lineNumber <= end; lineNumber += 1) {
+        const lineText = fileLines[lineNumber - 1] ?? '';
+        lines.push(`${String(lineNumber).padStart(width, ' ')} | ${lineText}`);
+
+        if (lineNumber === parsedLocation.line && parsedLocation.column !== undefined) {
+          const caretPadding = ' '.repeat(Math.max(0, parsedLocation.column - 1));
+          const caretLength = getCaretLength(lineText, parsedLocation.column);
+          lines.push(
+            `${' '.repeat(width)} | ${caretPadding}${severityColor('^'.repeat(caretLength))} ${c.dim(finding.ruleId)}`,
+          );
+        }
+      }
+
+      lines.push('  |');
+      renderedSource = true;
     }
-
-    const bulletLine = trimmed.startsWith('-') || trimmed.startsWith('•')
-      ? trimmed.replace(/^[-•]\s*/, '• ')
-      : `• ${trimmed}`;
-
-    lines.push(`│   ${chalk.green(bulletLine)}`);
   }
+
+  if (!renderedSource && parsedLocation.line !== undefined) {
+    lines.push('  = note: Source context unavailable');
+  }
+
+  if (finding.description.trim().length > 0 && finding.description.trim() !== finding.title.trim()) {
+    lines.push(`  = note: ${finding.description.trim()}`);
+  }
+
+  lines.push(...formatHelpLines(finding.fixGuidance));
 
   if (finding.documentationURL) {
-    lines.push(`│`);
-    lines.push(`│  ${chalk.cyanBright('Docs:')} ${chalk.underline.cyan(finding.documentationURL)}`);
+    lines.push(`  = docs: ${c.underline.cyan(finding.documentationURL)}`);
   }
 
-  lines.push(severityColor('└─'));
-
   return lines.join('\n');
+}
+
+function getComparableFilePath(location?: string): string {
+  return parseLocation(location).displayPath;
+}
+
+function getCheckedFileCount(result: ScanResult): number {
+  const files = new Set<string>();
+  for (const finding of result.findings) {
+    const parsed = parseLocation(finding.location);
+    if (parsed.filePath) {
+      files.add(parsed.filePath);
+    }
+  }
+
+  if (files.size > 0) {
+    return files.size;
+  }
+
+  if (result.targetCount > 0) {
+    return result.targetCount;
+  }
+
+  return 1;
 }
 
 /**
@@ -201,54 +253,16 @@ export async function formatText(result: ScanResult): Promise<string> {
   const c = await getChalk();
   const lines: string[] = [];
 
-  // Header
-  lines.push('');
-  lines.push(c.bold.cyanBright('┏━ ShipLint ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-  lines.push(c.dim('   Catch App Store rejections before they happen'));
-  lines.push(c.bold.cyanBright('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-  lines.push('');
-
-  lines.push(`${c.dim('Project')}   ${c.bold(result.projectPath)}`);
-  lines.push(`${c.dim('Scanned')}   ${result.timestamp.toISOString()}`);
-  lines.push(`${c.dim('Duration')}  ${result.duration}ms`);
-  lines.push(`${c.dim('Rules')}    ${result.rulesRun.length}`);
-  lines.push('');
-
   const counts = summarizeBySeverity(result.findings);
   const total = result.findings.length;
 
-  lines.push(c.bold('Summary'));
-  lines.push(`  ${renderStackedSummaryBar(counts, total)} ${c.bold(String(total))} finding${total === 1 ? '' : 's'}`);
-
-  for (const severity of SEVERITY_ORDER) {
-    const count = counts.get(severity) ?? 0;
-    if (count === 0) {
-      continue;
-    }
-
-    lines.push(`  ${getSeverityBadge(severity)} ${count}`);
-  }
-
-  if (total === 0) {
-    lines.push('');
-    lines.push(c.bgGreen.black.bold(' PASS ') + c.greenBright(' No issues found. Your app looks ready for review.'));
-    lines.push('');
-    return lines.join('\n');
-  }
-
-  lines.push('');
-  lines.push(c.bold('Findings'));
-
-  // Sort findings by severity, then by file group, then rule id
   const sortedFindings = [...result.findings].sort((a, b) => {
     const severityDelta = getSeverityRank(a.severity) - getSeverityRank(b.severity);
     if (severityDelta !== 0) {
       return severityDelta;
     }
 
-    const fileA = getFileGroup(a.location);
-    const fileB = getFileGroup(b.location);
-    const fileDelta = fileA.localeCompare(fileB);
+    const fileDelta = getComparableFilePath(a.location).localeCompare(getComparableFilePath(b.location));
     if (fileDelta !== 0) {
       return fileDelta;
     }
@@ -256,39 +270,32 @@ export async function formatText(result: ScanResult): Promise<string> {
     return a.ruleId.localeCompare(b.ruleId);
   });
 
-  const grouped = new Map<string, Finding[]>();
+  const fileCache = new Map<string, string[] | null>();
+
   for (const finding of sortedFindings) {
-    const key = getFileGroup(finding.location);
-    const existing = grouped.get(key) ?? [];
-    existing.push(finding);
-    grouped.set(key, existing);
-  }
-
-  let findingIndex = 0;
-  for (const [fileGroup, findings] of grouped) {
+    lines.push(await formatFinding(c, finding, fileCache));
     lines.push('');
-    lines.push(c.bold.cyan(`▸ ${fileGroup}`));
-
-    for (const finding of findings) {
-      lines.push(formatFinding(finding, findingIndex));
-      lines.push('');
-      findingIndex += 1;
-    }
   }
 
-  const criticalCount = counts.get(Severity.Critical) ?? 0;
-  const highCount = counts.get(Severity.High) ?? 0;
-  const blocksRelease = criticalCount + highCount > 0;
+  const criticalHighCount = (counts.get(Severity.Critical) ?? 0) + (counts.get(Severity.High) ?? 0);
+  const mediumCount = counts.get(Severity.Medium) ?? 0;
+  const lowInfoCount = (counts.get(Severity.Low) ?? 0) + (counts.get(Severity.Info) ?? 0);
 
-  lines.push(c.dim('─'.repeat(68)));
-  if (blocksRelease) {
-    lines.push(c.bgRed.white.bold(' FAIL ') + c.redBright(` ${criticalCount + highCount} blocking issue(s) (critical/high).`));
-  } else {
-    lines.push(c.bgYellow.black.bold(' WARN ') + c.yellowBright(' Issues found, but none are critical/high.'));
-  }
+  const checkedFileCount = getCheckedFileCount(result);
 
-  lines.push(c.dim('Tip: run with --format json for CI-friendly output.'));
+  lines.push(c.dim('━'.repeat(40)));
+  lines.push(`Checked ${c.bold(String(checkedFileCount))} file${checkedFileCount === 1 ? '' : 's'} in ${c.bold(`${result.duration}ms`)}`);
   lines.push('');
+  lines.push(
+    `  ${c.red('✖')} ${c.bold(String(criticalHighCount))} critical/high    ${c.yellow('⚠')} ${c.bold(String(mediumCount))} medium    ${c.blue('ℹ')} ${c.bold(String(lowInfoCount))} low/info`,
+  );
+  lines.push('');
+
+  if (total === 0) {
+    lines.push(c.green('✅ No issues found! Ready for App Store review.'));
+  } else {
+    lines.push(c.dim('Run `shiplint scan --format json .` for machine-readable output.'));
+  }
 
   return lines.join('\n');
 }

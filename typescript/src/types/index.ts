@@ -159,6 +159,7 @@ export enum OutputFormat {
   Text = 'text',
   JSON = 'json',
   SARIF = 'sarif',
+  Xcode = 'xcode',
 }
 
 /**

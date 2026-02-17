@@ -6,10 +6,12 @@ import { OutputFormat } from '../types/index.js';
 import { formatText } from './text.js';
 import { formatJSON } from './json.js';
 import { formatSARIF } from './sarif.js';
+import { formatXcode } from './xcode.js';
 
 export { formatText } from './text.js';
 export { formatJSON, formatJSONCompact } from './json.js';
 export { formatSARIF } from './sarif.js';
+export { formatXcode } from './xcode.js';
 
 /**
  * Format scan results based on output format
@@ -22,5 +24,7 @@ export async function format(result: ScanResult, outputFormat: OutputFormat): Pr
       return formatJSON(result);
     case OutputFormat.SARIF:
       return formatSARIF(result);
+    case OutputFormat.Xcode:
+      return formatXcode(result);
   }
 }
