@@ -296,7 +296,6 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
   lines.push(parts.join(' \u00b7 '));
 
   if (errorCount > 0) {
-    lines.push('Fix errors before submitting to App Store Connect.');
   }
 
   return lines.join('\n');

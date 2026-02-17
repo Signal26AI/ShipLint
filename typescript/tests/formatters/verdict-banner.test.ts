@@ -56,7 +56,6 @@ describe('text formatter summary logic', () => {
     const output = await formatText(result, { version: '1.5.0' });
 
     expect(output).toContain('1 error · 1 warning');
-    expect(output).toContain('Fix errors before submitting to App Store Connect.');
   });
 
   test('no findings still shows passed checks and clean summary', async () => {

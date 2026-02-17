@@ -76,7 +76,6 @@ describe('CLI output redesign', () => {
     expect(output).toContain('→ Needs written justification.');
 
     expect(output).toContain('1 error · 1 warning');
-    expect(output).toContain('Fix errors before submitting to App Store Connect.');
 
     expect(output).not.toContain('description:');
     expect(output).not.toContain('help:');
