@@ -143,6 +143,10 @@ function hasStartRecordingAudioContext(content: string): boolean {
   return /\b(AVAudio|AVCaptureAudio|SFSpeech|microphone|audio)\b/i.test(content);
 }
 
+export function stripComments(source: string): string {
+  return source.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
 export function detectAVSourceUsage(projectPath: string): AVSourceUsageSignals {
   const sourceFiles = findSourceFiles(projectPath);
 
@@ -158,6 +162,8 @@ export function detectAVSourceUsage(projectPath: string): AVSourceUsageSignals {
     } catch {
       continue;
     }
+
+    content = stripComments(content);
 
     if (!hasAVFoundationImport) {
       hasAVFoundationImport = AVFOUNDATION_IMPORT_PATTERNS.some((pattern) => pattern.test(content));
