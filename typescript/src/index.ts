@@ -29,4 +29,4 @@ export { scan, scanWithContext } from './core/scanner.js';
 export { applySuppression, parseShiplintIgnore, loadShiplintIgnore } from './core/suppression.js';
 
 // Formatters
-export { format, formatText, formatJSON, formatSARIF } from './formatters/index.js';
+export { format, formatText, formatJSON, formatSARIF, formatXcode } from './formatters/index.js';

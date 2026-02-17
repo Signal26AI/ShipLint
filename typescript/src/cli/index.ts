@@ -15,6 +15,8 @@ import packageJson from '../../package.json';
 
 const program = new Command();
 
+type CliOutputFormat = OutputFormat | 'xcode';
+
 program
   .name('shiplint')
   .description('App Store Review Guideline scanner for iOS projects')
@@ -24,7 +26,7 @@ program
   .command('scan')
   .description('Scan an Xcode project for potential App Store Review issues')
   .argument('<path>', 'Path to Xcode project, workspace, or directory')
-  .option('-f, --format <format>', 'Output format: text, json, sarif', 'text')
+  .option('-f, --format <format>', 'Output format: text, json, sarif, xcode', 'text')
   .option('-v, --verbose', 'Show verbose output', false)
   .option('-r, --rules <rules...>', 'Only run specific rules (by ID)')
   .option('-e, --exclude <rules...>', 'Exclude specific rules (by ID)')
@@ -35,7 +37,7 @@ program
       
       const result = await scan({
         path,
-        format: outputFormat,
+        format: outputFormat === 'xcode' ? OutputFormat.Text : outputFormat,
         verbose: options.verbose,
         rules: options.rules,
         exclude: options.exclude,
@@ -121,7 +123,7 @@ program
     }
   });
 
-function parseOutputFormat(format: string): OutputFormat {
+function parseOutputFormat(format: string): CliOutputFormat {
   switch (format.toLowerCase()) {
     case 'text':
       return OutputFormat.Text;
@@ -129,8 +131,10 @@ function parseOutputFormat(format: string): OutputFormat {
       return OutputFormat.JSON;
     case 'sarif':
       return OutputFormat.SARIF;
+    case 'xcode':
+      return 'xcode';
     default:
-      throw new Error(`Unknown output format: ${format}. Use text, json, or sarif.`);
+      throw new Error(`Unknown output format: ${format}. Use text, json, sarif, or xcode.`);
   }
 }
 
