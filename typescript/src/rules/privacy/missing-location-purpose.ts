@@ -74,6 +74,7 @@ This key is required for any location access. The description should explain the
 
 Good example: "Find coffee shops near your current location."
 Bad example: "Location access required" or ""`,
+        shortFixText: 'Replace the empty NSLocationWhenInUseUsageDescription with a meaningful explanation',
         documentationURL: 'https://developer.apple.com/documentation/corelocation/requesting_authorization_to_use_location_services',
       }));
     }
@@ -90,6 +91,7 @@ Bad example: "Location access required" or ""`,
 Current value: "${whenInUseDescription}"
 
 Write a description that helps users understand what feature uses location and why.`,
+        shortFixText: 'Replace the placeholder NSLocationWhenInUseUsageDescription with a real explanation',
         documentationURL: 'https://developer.apple.com/documentation/corelocation/requesting_authorization_to_use_location_services',
       }));
     }
@@ -119,6 +121,7 @@ Write a description that helps users understand what feature uses location and w
 
 Note: Always permission is heavily scrutinized. Only request it if you have a visible, ` +
               `continuous location feature like navigation or fitness tracking.`,
+            shortFixText: 'Add NSLocationAlwaysAndWhenInUseUsageDescription to Info.plist (required with Always permission)',
             documentationURL: 'https://developer.apple.com/documentation/corelocation/choosing_the_location_services_authorization_to_request',
           }));
         }
@@ -135,6 +138,7 @@ Note: Always permission is heavily scrutinized. Only request it if you have a vi
 
 Example: "Track your runs in the background so you can see your route even ` +
             `when the screen is off."`,
+          shortFixText: 'Replace the empty NSLocationAlwaysAndWhenInUseUsageDescription with a meaningful explanation',
           documentationURL: 'https://developer.apple.com/documentation/corelocation/choosing_the_location_services_authorization_to_request',
         }));
       }
@@ -147,6 +151,7 @@ Example: "Track your runs in the background so you can see your route even ` +
           location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Replace the placeholder with a real description of your continuous location feature. ` +
             `Always permission requires a clear, user-visible justification.`,
+          shortFixText: 'Replace the placeholder NSLocationAlwaysAndWhenInUseUsageDescription with a real explanation',
           documentationURL: 'https://developer.apple.com/documentation/corelocation/choosing_the_location_services_authorization_to_request',
         }));
       }

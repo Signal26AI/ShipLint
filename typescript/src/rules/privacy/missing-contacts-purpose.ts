@@ -73,6 +73,7 @@ Good example: "Find friends in your contacts who use the app."
 Bad example: "Contacts access required" or ""
 
 Note: Contacts are sensitive data. Only request access if you have a clear user-facing need.`,
+          shortFixText: 'Replace the empty NSContactsUsageDescription with a meaningful explanation',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nscontactsusagedescription',
         }),
       ];
@@ -92,6 +93,7 @@ Note: Contacts are sensitive data. Only request access if you have a clear user-
 Current value: "${contactsDescription}"
 
 Write a description that helps users understand what feature uses contacts and why.`,
+          shortFixText: 'Replace the placeholder NSContactsUsageDescription with a real explanation',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nscontactsusagedescription',
         }),
       ];

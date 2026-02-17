@@ -103,6 +103,7 @@ import AuthenticationServices
 
 Note: If you're using a third-party library that wraps SIWA, you can ignore ` +
             `this finding.`,
+          shortFixText: 'Link AuthenticationServices framework and implement the Sign in with Apple flow',
           documentationURL: 'https://developer.apple.com/sign-in-with-apple/',
         }));
       }
@@ -128,6 +129,7 @@ You're exempt from Guideline 4.8. Sign in with Apple is not required for ` +
 **If using Firebase Auth with social providers:**
 Firebase supports Sign in with Apple - add it as a provider:
 https://firebase.google.com/docs/auth/ios/apple`,
+        shortFixText: 'Add Sign in with Apple as a login option alongside your social login providers',
         documentationURL: 'https://developer.apple.com/sign-in-with-apple/',
       }));
     }

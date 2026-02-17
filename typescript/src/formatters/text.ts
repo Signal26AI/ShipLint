@@ -82,11 +82,6 @@ function getSeverityColor(c: typeof import('chalk').default, severity: Severity)
   }
 }
 
-function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, maxLength - 3).trimEnd()}...`;
-}
-
 function firstSentence(text: string): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (!normalized) return '';
@@ -106,12 +101,12 @@ function shortExplanation(finding: Finding): string {
 }
 
 
-function shortFix(fixGuidance: string): string {
-  if (!fixGuidance?.trim()) return '';
-  // Take first line, extract first sentence, cap length
-  const first = fixGuidance.split('\n')[0].replace(/\s+/g, ' ').trim();
-  const sentence = firstSentence(first);
-  return truncate(sentence || first, 120);
+function shortFix(finding: Finding): string {
+  if (finding.shortFixText) return finding.shortFixText;
+  if (!finding.fixGuidance?.trim()) return '';
+  // Fallback: extract first sentence from fixGuidance, but never truncate
+  const first = finding.fixGuidance.split('\n')[0].replace(/\s+/g, ' ').trim();
+  return firstSentence(first) || first;
 }
 
 function wrapText(text: string, width: number): string[] {
@@ -141,41 +136,6 @@ function wrapText(text: string, width: number): string[] {
   }
 
   return wrapped;
-}
-
-function boxify(content: string, maxWidth = 70): string[] {
-  const rawLines = content
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .filter((line) => line.trim().length > 0);
-
-  if (rawLines.length === 0) {
-    return [];
-  }
-
-  // Wrap long lines instead of truncating
-  const wrappedLines: string[] = [];
-  for (const line of rawLines) {
-    if (line.length <= maxWidth) {
-      wrappedLines.push(line);
-    } else if (line.trimStart().startsWith('<')) {
-      // XML/code lines: don't word-wrap, just allow full width
-      wrappedLines.push(line);
-    } else {
-      // Word-wrap prose lines
-      for (const wl of wrapText(line, maxWidth)) {
-        wrappedLines.push(wl);
-      }
-    }
-  }
-
-  const width = Math.max(...wrappedLines.map((line) => line.length), maxWidth);
-
-  const top = `┌${'─'.repeat(width + 2)}┐`;
-  const middle = wrappedLines.map((line) => `│ ${line.padEnd(width, ' ')} │`);
-  const bottom = `└${'─'.repeat(width + 2)}┘`;
-
-  return [top, ...middle, bottom];
 }
 
 function displayProjectName(projectPath: string): string {
@@ -229,25 +189,21 @@ async function formatFinding(finding: Finding, verbose: boolean): Promise<string
   lines.push(`    ${color(`→ ${shortExplanation(finding)}`)}`);
 
   if (!verbose) {
-    if (finding.severity === Severity.Critical && finding.fixGuidance?.trim()) {
-      lines.push(`    ${c.cyan(`Fix: ${shortFix(finding.fixGuidance)}`)}`);
+    if (finding.severity === Severity.Critical && (finding.shortFixText || finding.fixGuidance?.trim())) {
+      lines.push(`    ${c.cyan(`Fix: ${shortFix(finding)}`)}`);
     }
     return lines;
   }
 
-  const fullDescription = finding.description.replace(/\s+/g, ' ').trim();
-  if (fullDescription) {
-    lines.push('');
-    for (const wrappedLine of wrapText(fullDescription, 76)) {
-      lines.push(wrappedLine ? `    ${wrappedLine}` : '');
-    }
-  }
-
   if (finding.fixGuidance.trim()) {
     lines.push('');
-    lines.push('    Suggested fix:');
-    for (const boxLine of boxify(finding.fixGuidance, 68)) {
-      lines.push(`    ${boxLine}`);
+    lines.push('    Fix:');
+    // Extract just the code/action lines from fixGuidance (skip prose)
+    const fixLines = finding.fixGuidance.split('\n')
+      .map((l: string) => l.trimEnd())
+      .filter((l: string) => l.trim().length > 0);
+    for (const fixLine of fixLines) {
+      lines.push(`    │ ${fixLine}`);
     }
   }
 
@@ -293,7 +249,11 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
     const finding = sortedFindings[i];
     lines.push(...(await formatFinding(finding, verbose)));
     if (i < sortedFindings.length - 1) {
-      lines.push('');
+      if (verbose) {
+        lines.push('────────────────────────────────────────');
+      } else {
+        lines.push('');
+      }
     }
   }
 

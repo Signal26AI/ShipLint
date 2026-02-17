@@ -76,6 +76,7 @@ OPTION 2: Use targeted exceptions for specific domains
 If you must use NSAllowsArbitraryLoads, you'll need to provide App Store Connect with a justification. ` +
             `Valid reasons include: connecting to servers you don't control, media streaming requirements, ` +
             `or supporting legacy enterprise systems.`,
+          shortFixText: 'Remove NSAllowsArbitraryLoads and use NSExceptionDomains for specific domains instead',
           documentationURL: 'https://developer.apple.com/documentation/security/preventing_insecure_network_connections',
         }));
       } else {
@@ -95,6 +96,7 @@ Current configuration appears redundant:
 - NSExceptionDomains configured (allows specific domains)
 
 The exception domains are ignored when NSAllowsArbitraryLoads is true.`,
+          shortFixText: 'Remove NSAllowsArbitraryLoads since you have NSExceptionDomains configured',
           documentationURL: 'https://developer.apple.com/documentation/security/preventing_insecure_network_connections',
         }));
       }
@@ -125,6 +127,7 @@ The exception domains are ignored when NSAllowsArbitraryLoads is true.`,
         </dict>
     </dict>
 </dict>`,
+        shortFixText: 'Consider using NSExceptionDomains instead of NSAllowsArbitraryLoadsInWebContent',
         documentationURL: 'https://developer.apple.com/documentation/security/preventing_insecure_network_connections',
       }));
     }
@@ -161,6 +164,7 @@ The exception domains are ignored when NSAllowsArbitraryLoads is true.`,
 </dict>
 
 Better yet, work with the server operator to enable HTTPS and remove this exception entirely.`,
+            shortFixText: 'Add NSExceptionMinimumTLSVersion or upgrade to HTTPS for this domain',
             documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsapptransportsecurity/nsexceptiondomains',
           }));
         }

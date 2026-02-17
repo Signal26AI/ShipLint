@@ -53,6 +53,7 @@ export const MissingEncryptionFlagRule: Rule = {
 Set it to true only if your app uses custom encryption algorithms beyond standard HTTPS ` +
           `(e.g., proprietary encryption, custom TLS implementations). In that case, you'll also ` +
           `need to submit export compliance documentation to Apple.`,
+        shortFixText: 'Add ITSAppUsesNonExemptEncryption to Info.plist (set to false for most apps)',
         documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/itsappusesnonexemptencryption',
       }),
     ];

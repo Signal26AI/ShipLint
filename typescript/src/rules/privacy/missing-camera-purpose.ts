@@ -96,6 +96,7 @@ export const MissingCameraPurposeRule: Rule = {
             `<string>We need access to your camera to take photos for your profile.</string>\n\n` +
             `The description should explain the specific feature that uses the camera and ` +
             `be written from the user's perspective.`,
+          shortFixText: 'Add NSCameraUsageDescription to Info.plist explaining why your app needs camera access',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nscamerausagedescription',
         }),
       ];
@@ -115,6 +116,7 @@ export const MissingCameraPurposeRule: Rule = {
             `needs camera access. Generic or empty descriptions may be rejected.\n\n` +
             `Good example: "We use your camera to scan QR codes for quick login."\n` +
             `Bad example: "Camera access required" or ""`,
+          shortFixText: 'Replace the empty NSCameraUsageDescription with a meaningful explanation of camera usage',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nscamerausagedescription',
         }),
       ];
@@ -134,6 +136,7 @@ export const MissingCameraPurposeRule: Rule = {
             `The description should be specific to your app's features.\n\n` +
             `Current value: "${cameraDescription}"\n\n` +
             `Write a description that helps users understand what feature uses the camera and why.`,
+          shortFixText: 'Replace the placeholder NSCameraUsageDescription with a real explanation of camera usage',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nscamerausagedescription',
         }),
       ];

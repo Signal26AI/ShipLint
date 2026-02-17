@@ -27,6 +27,7 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
     guideline: '5.1.2',
     fixGuidance: '<key>NSPrivacyAccessedAPIType</key>\n<string>NSPrivacyAccessedAPICategoryUserDefaults</string>',
     documentationURL: 'https://developer.apple.com/documentation/bundleresources/privacy_manifest_files',
+    shortFixText: undefined,
     ...overrides,
   };
 }
@@ -90,7 +91,7 @@ describe('CLI output redesign', () => {
     // expect(passedIndex).toBeLessThan(findingIndex);
   });
 
-  test('verbose mode expands each finding with full context and boxed guidance', async () => {
+  test('verbose mode shows clean layout with fix box and divider', async () => {
     const output = await formatText(
       makeResult([
         makeFinding({
@@ -103,10 +104,13 @@ describe('CLI output redesign', () => {
 
     expect(output).toContain('✖ Missing PrivacyInfo.xcprivacy for UserDefaults API');
     expect(output).toContain('→ Your app uses UserDefaults but has no privacy manifest.');
-    expect(output).toContain('Apple requires PrivacyInfo.xcprivacy.');
-    expect(output).toContain('Suggested fix:');
-    expect(output).toContain('┌');
-    expect(output).toContain('└');
+    // No description paragraph (removed in redesign)
+    expect(output).not.toContain('Suggested fix:');
+    expect(output).not.toContain('┌');
+    expect(output).not.toContain('└');
+    // Fix box uses │ prefix
+    expect(output).toContain('Fix:');
+    expect(output).toMatch(/│.*NSPrivacyAccessedAPIType/);
     expect(output).toContain('→ https://developer.apple.com/documentation/bundleresources/privacy_manifest_files');
   });
 
@@ -152,7 +156,7 @@ describe('inline fix hints for critical findings', () => {
     expect(output).not.toContain('Fix:');
   });
 
-  test('verbose mode does NOT show inline Fix: line (uses boxed guidance instead)', async () => {
+  test('verbose mode shows Fix: with piped content (not inline hint)', async () => {
     const output = await formatText(
       makeResult([
         makeFinding({
@@ -165,9 +169,9 @@ describe('inline fix hints for critical findings', () => {
       { verbose: true, version: '1.5.0' }
     );
 
-    // verbose shows the full "Suggested fix:" box, not the inline Fix: line
-    expect(output).toContain('Suggested fix:');
-    expect(output).not.toMatch(/^\s+Fix:/m);
+    // verbose shows Fix: with piped content
+    expect(output).toContain('Fix:');
+    expect(output).toMatch(/│.*Add NSCameraUsageDescription/);
   });
 });
 
@@ -188,5 +192,46 @@ describe('verbose nudge footer', () => {
     );
 
     expect(output).not.toContain('Run shiplint scan --verbose for details');
+  });
+});
+
+
+describe('shortFixText on findings', () => {
+  test('critical findings with shortFixText show it in Fix: line', async () => {
+    const output = await formatText(
+      makeResult([
+        makeFinding({
+          severity: Severity.Critical,
+          title: 'Missing Camera Usage Description',
+          description: 'Camera framework used without NSCameraUsageDescription.',
+          fixGuidance: 'Add NSCameraUsageDescription to your Info.plist with a long explanation that would have been truncated before.',
+          shortFixText: 'Add NSCameraUsageDescription to Info.plist explaining why your app needs camera access',
+        }),
+      ]),
+      { version: '1.5.0' }
+    );
+
+    expect(output).toContain('Fix: Add NSCameraUsageDescription to Info.plist explaining why your app needs camera access');
+    // Should NOT truncate or use fixGuidance text
+    expect(output).not.toContain('...');
+  });
+
+  test('verbose mode shows thin dividers between findings', async () => {
+    const output = await formatText(
+      makeResult([
+        makeFinding(),
+        makeFinding({
+          ruleId: 'config-001-ats-exception-without-justification',
+          severity: Severity.Medium,
+          title: 'ATS exception for *.example.com',
+          description: 'Needs written justification.',
+          fixGuidance: 'Document why ATS must be relaxed for this domain.',
+          documentationURL: undefined,
+        }),
+      ]),
+      { verbose: true, version: '1.5.0' }
+    );
+
+    expect(output).toContain('────────────────────────────────────────');
   });
 });

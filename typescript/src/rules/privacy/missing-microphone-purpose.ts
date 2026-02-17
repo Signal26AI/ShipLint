@@ -75,6 +75,7 @@ export const MissingMicrophonePurposeRule: Rule = {
             `<key>NSSpeechRecognitionUsageDescription</key>\n` +
             `<string>We use speech recognition to transcribe your voice notes.</string>\n\n` +
             `Note: You'll also need NSMicrophoneUsageDescription since speech recognition requires microphone access.`,
+          shortFixText: 'Add NSSpeechRecognitionUsageDescription to Info.plist explaining why your app needs speech recognition',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsspeechrecognitionusagedescription',
         }));
       } else if (speechDescription.trim() === '') {
@@ -83,6 +84,7 @@ export const MissingMicrophonePurposeRule: Rule = {
           description: 'NSSpeechRecognitionUsageDescription exists but is empty.',
           location: context.infoPlistPath || 'Info.plist',
           fixGuidance: 'Provide a meaningful description for speech recognition usage.',
+          shortFixText: 'Replace the empty NSSpeechRecognitionUsageDescription with a meaningful explanation',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsspeechrecognitionusagedescription',
         }));
       } else if (isPlaceholder(speechDescription)) {
@@ -91,6 +93,7 @@ export const MissingMicrophonePurposeRule: Rule = {
           description: `NSSpeechRecognitionUsageDescription contains placeholder text: "${speechDescription}".`,
           location: context.infoPlistPath || 'Info.plist',
           fixGuidance: 'Replace the placeholder with a real description of your speech recognition feature.',
+          shortFixText: 'Replace the placeholder NSSpeechRecognitionUsageDescription with a real explanation',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsspeechrecognitionusagedescription',
         }));
       }
@@ -143,6 +146,7 @@ export const MissingMicrophonePurposeRule: Rule = {
           `<key>NSMicrophoneUsageDescription</key>\n` +
           `<string>We need microphone access to record voice messages and make calls.</string>\n\n` +
           `The description should explain the specific feature that uses the microphone.`,
+        shortFixText: 'Add NSMicrophoneUsageDescription to Info.plist explaining why your app needs mic access',
         documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsmicrophoneusagedescription',
       }));
     }
@@ -159,6 +163,7 @@ export const MissingMicrophonePurposeRule: Rule = {
           `needs microphone access. Generic or empty descriptions will be rejected.\n\n` +
           `Good example: "Record audio for your video messages."\n` +
           `Bad example: "Microphone access required" or ""`,
+        shortFixText: 'Replace the empty NSMicrophoneUsageDescription with a meaningful explanation',
         documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsmicrophoneusagedescription',
       }));
     }
@@ -175,6 +180,7 @@ export const MissingMicrophonePurposeRule: Rule = {
           `The description should be specific to your app's features.\n\n` +
           `Current value: "${microphoneDescription}"\n\n` +
           `Write a description that helps users understand what feature uses the microphone and why.`,
+        shortFixText: 'Replace the placeholder NSMicrophoneUsageDescription with a real explanation',
         documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsmicrophoneusagedescription',
       }));
     }

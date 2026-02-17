@@ -71,6 +71,7 @@ If your app only needs to save photos (not read), you can use NSPhotoLibraryAddU
 
 Good example: "Choose photos to share with your friends."
 Bad example: "Photo access required" or ""`,
+        shortFixText: 'Replace the empty NSPhotoLibraryUsageDescription with a meaningful explanation',
         documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsphotolibraryusagedescription',
       }));
     }
@@ -87,6 +88,7 @@ Bad example: "Photo access required" or ""`,
 Current value: "${photoLibraryDescription}"
 
 Write a description that helps users understand what feature uses the photo library and why.`,
+        shortFixText: 'Replace the placeholder NSPhotoLibraryUsageDescription with a real explanation',
         documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsphotolibraryusagedescription',
       }));
     }
@@ -102,6 +104,7 @@ Write a description that helps users understand what feature uses the photo libr
           fixGuidance: `Update NSPhotoLibraryAddUsageDescription with a clear explanation of why your app needs to save photos.
 
 Good example: "Save edited photos to your library."`,
+          shortFixText: 'Replace the empty NSPhotoLibraryAddUsageDescription with a meaningful explanation',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsphotolibraryaddusagedescription',
         }));
       } else if (isPlaceholder(photoLibraryAddDescription)) {
@@ -110,6 +113,7 @@ Good example: "Save edited photos to your library."`,
           description: `NSPhotoLibraryAddUsageDescription contains placeholder text: "${photoLibraryAddDescription}".`,
           location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Replace the placeholder with a real description of why your app needs to save photos.`,
+          shortFixText: 'Replace the placeholder NSPhotoLibraryAddUsageDescription with a real explanation',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsphotolibraryaddusagedescription',
         }));
       }

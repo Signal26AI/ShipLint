@@ -69,6 +69,8 @@ export interface Finding {
   guideline: string;
   fixGuidance: string;
   documentationURL?: string;
+  /** Concise one-line fix hint for default (non-verbose) CLI output */
+  shortFixText?: string;
   /** Whether this finding was suppressed */
   suppressed?: boolean;
   /** Reason for suppression */

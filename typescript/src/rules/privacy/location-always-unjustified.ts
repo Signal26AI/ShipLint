@@ -108,6 +108,7 @@ Bad examples:
 - "We use your location" (too vague)
 - "Location is required" (doesn't explain feature)
 - "Show nearby places" (doesn't justify Always)`,
+            shortFixText: 'Update the Always location description to clearly explain a continuous location feature',
             documentationURL: 'https://developer.apple.com/documentation/corelocation/choosing_the_location_services_authorization_to_request',
           }));
         }

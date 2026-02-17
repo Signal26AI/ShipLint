@@ -69,6 +69,7 @@ The description should explain the specific feature that uses Bluetooth and ` +
 
 Good example: "We use Bluetooth to connect to your heart rate monitor."
 Bad example: "Bluetooth access required" or ""`,
+          shortFixText: 'Replace the empty NSBluetoothAlwaysUsageDescription with a meaningful explanation',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsbluetoothalwaysusagedescription',
         }),
       ];
@@ -88,6 +89,7 @@ Bad example: "Bluetooth access required" or ""`,
 Current value: "${bluetoothDescription}"
 
 Write a description that helps users understand what feature uses Bluetooth and why.`,
+          shortFixText: 'Replace the placeholder NSBluetoothAlwaysUsageDescription with a real explanation',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsbluetoothalwaysusagedescription',
         }),
       ];

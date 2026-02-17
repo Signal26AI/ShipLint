@@ -137,6 +137,7 @@ Example PrivacyInfo.xcprivacy structure:
     </array>
 </dict>
 </plist>`,
+        shortFixText: 'Create PrivacyInfo.xcprivacy and declare Required Reason API usage from your SDKs',
         documentationURL: 'https://developer.apple.com/documentation/bundleresources/privacy_manifest_files',
       }));
     }
@@ -163,6 +164,7 @@ Example PrivacyInfo.xcprivacy structure:
 - Active keyboard APIs (activeInputModes)
 
 If any are used, create a PrivacyInfo.xcprivacy and declare the appropriate reasons.`,
+          shortFixText: 'Consider adding PrivacyInfo.xcprivacy to declare Required Reason API usage',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/privacy_manifest_files/describing_use_of_required_reason_api',
         }));
       }

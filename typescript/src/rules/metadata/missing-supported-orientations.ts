@@ -94,6 +94,7 @@ For iPad, also consider adding UISupportedInterfaceOrientations~ipad with ` +
 </array>
 
 Most apps should support at minimum UIInterfaceOrientationPortrait.`,
+          shortFixText: 'Add at least one orientation to UISupportedInterfaceOrientations in Info.plist',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/uisupportedinterfaceorientations',
         }),
       ];

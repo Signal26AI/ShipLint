@@ -270,6 +270,7 @@ export const RequiredReasonAPIRule: Rule = {
             `\n\nIn Xcode: File > New > File > App Privacy. Then add entries under NSPrivacyAccessedAPITypes ` +
             `for each category with appropriate reason codes.\n\n` +
             `See: https://developer.apple.com/documentation/bundleresources/privacy_manifest_files/describing_use_of_required_reason_api`,
+          shortFixText: 'Create PrivacyInfo.xcprivacy and declare your Required Reason APIs',
           documentationURL:
             'https://developer.apple.com/documentation/bundleresources/privacy_manifest_files/describing_use_of_required_reason_api',
         })
@@ -311,6 +312,7 @@ export const RequiredReasonAPIRule: Rule = {
               `    </array>\n` +
               `</dict>\n\n` +
               `Replace REASON_CODE with the appropriate reason from Apple's documentation.`,
+            shortFixText: 'Add the missing API category to NSPrivacyAccessedAPITypes in PrivacyInfo.xcprivacy',
             documentationURL:
               'https://developer.apple.com/documentation/bundleresources/privacy_manifest_files/describing_use_of_required_reason_api',
           })
