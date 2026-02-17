@@ -184,6 +184,8 @@ describe('MissingCameraPurposeRule', () => {
     const findingsAVKit = await MissingCameraPurposeRule.evaluate(contextAVKit);
 
     expect(findingsAVKit).toHaveLength(1);
+    expect(findingsAVKit[0].severity).toBe(Severity.Critical);
+    expect(findingsAVKit[0].confidence).toBe(Confidence.High);
   });
 
   it('should NOT flag VisionKit alone (ImageAnalyzer does not require camera)', async () => {

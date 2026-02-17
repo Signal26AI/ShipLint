@@ -61,7 +61,7 @@ export const MissingCameraPurposeRule: Rule = {
         ? Confidence.Medium
         : Confidence.High;
 
-    const severityLevel = hasCameraSpecificUsage
+    const severityLevel = hasCameraSpecificUsage || !hasOnlyAVFoundation
       ? Severity.Critical
       : Severity.Medium;
 
