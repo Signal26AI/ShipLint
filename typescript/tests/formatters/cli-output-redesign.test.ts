@@ -76,7 +76,7 @@ describe('CLI output redesign', () => {
     expect(output).toContain('△ ATS exception for *.example.com');
     expect(output).toContain('→ Needs written justification.');
 
-    expect(output).toContain('1 error · 1 warning');
+    expect(output).toContain('1 error · 1 warning · 1 passed');
 
     expect(output).not.toContain('description:');
     expect(output).not.toContain('help:');

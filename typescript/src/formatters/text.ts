@@ -18,6 +18,15 @@ async function getChalk() {
   }
   return chalk;
 }
+const BRAND_GREEN = '#10b981';
+function brandColor(c: typeof import('chalk').default): (text: string) => string {
+  try {
+    const fn = c.hex?.(BRAND_GREEN);
+    if (typeof fn === 'function') return fn;
+  } catch { /* fallback */ }
+  return c.green;
+}
+
 
 export interface TextFormatOptions {
   verbose?: boolean;
@@ -237,7 +246,7 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
   const warningCount = result.findings.filter((finding) => finding.severity === Severity.Medium).length;
 
   const lines: string[] = [];
-  lines.push(`${c.green(`ShipLint v${version}`)} — scanning ${displayProjectName(result.projectPath)}`);
+  lines.push(`${brandColor(c)(`ShipLint v${version}`)} — scanning ${displayProjectName(result.projectPath)}`);
   if (verbose) {
     lines.push(c.dim(`  ${result.timestamp.toISOString()} · ${result.duration}ms · ${result.rulesRun.length} rules`));
   }
@@ -264,8 +273,8 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
   const parts: string[] = [];
   if (errorCount > 0) parts.push(c.red(`${errorCount} error${errorCount === 1 ? '' : 's'}`));
   if (warningCount > 0) parts.push(c.yellow(`${warningCount} warning${warningCount === 1 ? '' : 's'}`));
-  if (passedCount > 0) parts.push(c.green(`${passedCount} passed`));
-  if (parts.length === 0) parts.push(c.green('No issues found'));
+  if (errorCount === 0 && warningCount === 0) parts.push(brandColor(c)('No issues found'));
+  if (passedCount > 0) parts.push(brandColor(c)(`${passedCount} passed`));
   lines.push(parts.join(' \u00b7 '));
 
   if (sortedFindings.length > 0) {
