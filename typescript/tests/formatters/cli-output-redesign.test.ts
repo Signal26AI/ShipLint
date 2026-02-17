@@ -51,7 +51,7 @@ function makeResult(projectPath: string, findings: Finding[]): ScanResult {
 }
 
 describe('CLI output redesign', () => {
-  test('text formatter shows rust-style diagnostic when location + line are available', async () => {
+  test('text formatter renders clean hierarchical finding blocks', async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'shiplint-format-'));
     const srcDir = path.join(tmp, 'Sources');
     fs.mkdirSync(srcDir, { recursive: true });
@@ -62,21 +62,55 @@ describe('CLI output redesign', () => {
 
     const output = await formatText(makeResult(tmp, [makeFinding()]));
 
-    expect(output).toContain('Sources/App.swift:2:');
-    expect(output).toContain('privacy-010 [MEDIUM] Missing privacy manifest declaration');
-    expect(output).toContain('^');
-    expect(output).toContain('= help: Add NSPrivacyAccessedAPICategoryUserDefaults with reason CA92.1');
-    expect(output).toContain('= docs: https://shiplint.app/errors/itms-91053');
+    expect(output).toContain('── MEDIUM (1)');
+    expect(output).toContain('⚠ Missing privacy manifest declaration');
+    expect(output).toContain('privacy-010 · MEDIUM · Sources/App.swift:2');
+    expect(output).toContain('Privacy manifest declaration is missing.');
+    expect(output).toContain('Fix: Add NSPrivacyAccessedAPICategoryUserDefaults with reason CA92.1');
+    expect(output).toContain('→ https://shiplint.app/errors/itms-91053');
     expect(output).toContain('Checked 1 files in 42ms');
   });
 
-  test('text formatter degrades gracefully without source line info', async () => {
+  test('text formatter degrades gracefully without location info and avoids debug-style labels', async () => {
     const finding = makeFinding({ location: undefined, line: undefined });
     const output = await formatText(makeResult('/tmp/project', [finding]));
 
-    expect(output).toContain('privacy-010 [MEDIUM] Missing privacy manifest declaration');
-    expect(output).toContain('description: Privacy manifest declaration is missing.');
-    expect(output).toContain('help: Add NSPrivacyAccessedAPICategoryUserDefaults with reason CA92.1');
+    expect(output).toContain('privacy-010 · MEDIUM');
+    expect(output).toContain('Privacy manifest declaration is missing.');
+    expect(output).toContain('Fix: Add NSPrivacyAccessedAPICategoryUserDefaults with reason CA92.1');
+    expect(output).not.toContain('description:');
+    expect(output).not.toContain('help:');
+    expect(output).not.toContain('docs:');
+  });
+
+  test('text formatter wraps prose and fix code blocks to terminal width with indentation', async () => {
+    const original = process.stdout.columns;
+
+    try {
+      Object.defineProperty(process.stdout, 'columns', { value: 60, configurable: true });
+
+      const output = await formatText(
+        makeResult('/tmp/project', [
+          makeFinding({
+            description:
+              'Your app links AVFoundation but Info.plist is missing NSCameraUsageDescription and this sentence is intentionally long to force wrapping.',
+            fixGuidance:
+              'Add to Info.plist:\n\n<key>NSCameraUsageDescription</key>\n<string>We need camera access to scan documents.</string>',
+          }),
+        ])
+      );
+
+      for (const line of output.split('\n')) {
+        expect(line.length).toBeLessThanOrEqual(60);
+      }
+
+      expect(output).toMatch(/\n    Your app links AVFoundation but Info\.plist is missing/);
+      expect(output).toMatch(/\n      <key>NSCameraUsageDescription<\/key>/);
+      expect(output).toMatch(/\n      <string>We need camera access to scan/);
+      expect(output).toMatch(/\n      documents\.<\/string>/);
+    } finally {
+      Object.defineProperty(process.stdout, 'columns', { value: original, configurable: true });
+    }
   });
 
   test('xcode formatter emits native warning lines', () => {
