@@ -2,6 +2,35 @@
 
 All notable changes to ShipLint will be documented in this file.
 
+## [1.6.0] - 2026-02-17
+
+### Fixed
+- Source scanner now ignores commented-out code (`//` and `/* */` blocks)
+- Removed redundant "Fix errors before submitting" action hint from CLI output
+- AVFoundation-only camera findings downgraded to High/Medium confidence (matches microphone rule)
+- Camera-specific frameworks (AVKit) correctly remain Critical/High
+
+### Changed
+- CLI output redesign: Rust-style diagnostics, severity-grouped findings, compact header
+- Default mode: icon + title + one-line explanation (terminal-width-aware)
+- Verbose mode: full descriptions, boxed fix guidance with wrapping, docs URLs
+- Summary shows separate error/warning counts
+- Red for Critical (errors), yellow for Warnings
+
+## [1.5.0] - 2026-02-06
+
+### Changed
+- Severity semantics: Critical = guaranteed App Store rejection only
+- Microphone rule: AVFoundation-only downgraded to High/Medium confidence
+- Location-always-unjustified downgraded to High
+- CLI redesign v1: severity grouping, Xcode formatter
+
+## [1.4.0] - 2026-02-06
+
+### Added
+- MCP support: `shiplint mcp` command with scan, rules, and explain tools
+- Competitive positioning updates
+
 ## [1.0.0] - 2026-02-05
 
 ### Added
