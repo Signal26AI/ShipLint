@@ -43,7 +43,10 @@ program
         exclude: options.exclude,
       });
       
-      const output = await format(result, outputFormat);
+      const output = await format(result, outputFormat, {
+        verbose: options.verbose,
+        version: packageJson.version,
+      });
       console.log(output);
       
       // Anonymous analytics ping (fire-and-forget, opt-out with SHIPLINT_NO_TELEMETRY=1)
