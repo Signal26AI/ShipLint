@@ -64,8 +64,8 @@ describe('text formatter summary logic', () => {
     const output = await formatText(result, { version: '1.5.0' });
 
     expect(output).toContain('ShipLint v1.5.0 — scanning project');
-    expect(output).toContain('passed');
-    expect(output).toContain('passed');
+    expect(output).toContain('No issues found');
+    expect(output).toContain('No issues found');
     expect(output).not.toContain('Fix errors before submitting to App Store Connect.');
   });
 
@@ -82,6 +82,6 @@ describe('text formatter summary logic', () => {
 
     expect(output).toContain('ℹ Low issue');
     expect(output).toContain('ℹ Info issue');
-    expect(output).toContain('passed');
+    expect(output).toContain('No issues found');
   });
 });

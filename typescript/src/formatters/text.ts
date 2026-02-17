@@ -277,7 +277,6 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
   const parts: string[] = [];
   if (errorCount > 0) parts.push(c.red(`${errorCount} error${errorCount === 1 ? '' : 's'}`));
   if (warningCount > 0) parts.push(c.yellow(`${warningCount} warning${warningCount === 1 ? '' : 's'}`));
-  if (passedCount > 0) parts.push(c.green(`${passedCount} passed`));
   if (parts.length === 0) parts.push(c.green('No issues found'));
   lines.push(parts.join(' \u00b7 '));
 
