@@ -193,6 +193,7 @@ export const PrivateAPIUsageRule: Rule = {
             location: relFile,
             line: det.line,
             fixGuidance: 'Replace all UIWebView usage with WKWebView. Also check your dependencies — some older pods still reference UIWebView.',
+            shortFixText: 'Replace UIWebView with WKWebView (also check third-party dependencies)',
             documentationURL: 'https://developer.apple.com/documentation/webkit/wkwebview',
           }));
           break;
@@ -203,6 +204,7 @@ export const PrivateAPIUsageRule: Rule = {
             location: relFile,
             line: det.line,
             fixGuidance: 'Use public API alternatives instead of KVC on private properties. For placeholder color, use attributedPlaceholder. For search fields, use searchTextField (iOS 13+).',
+            shortFixText: 'Use public API alternatives instead of KVC on private UIKit properties',
           }));
           break;
         case 'private-import':
@@ -212,6 +214,7 @@ export const PrivateAPIUsageRule: Rule = {
             location: relFile,
             line: det.line,
             fixGuidance: 'Remove imports of private Apple frameworks and use only public APIs.',
+            shortFixText: 'Remove imports of private Apple frameworks and use only public APIs',
           }));
           break;
         case 'private-selector':
@@ -221,6 +224,7 @@ export const PrivateAPIUsageRule: Rule = {
             location: relFile,
             line: det.line,
             fixGuidance: 'Replace private selector calls with equivalent public API methods.',
+            shortFixText: 'Replace private selector calls with equivalent public API methods',
           }));
           break;
       }

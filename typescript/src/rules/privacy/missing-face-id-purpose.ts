@@ -69,6 +69,7 @@ The description should explain what feature uses Face ID and ` +
 
 Good example: "We use Face ID to securely log you in without a password."
 Bad example: "Face ID access required" or ""`,
+          shortFixText: 'Replace the empty NSFaceIDUsageDescription with a meaningful explanation',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsfaceidusagedescription',
         }),
       ];
@@ -88,6 +89,7 @@ Bad example: "Face ID access required" or ""`,
 Current value: "${faceIdDescription}"
 
 Write a description that helps users understand what feature uses Face ID and why.`,
+          shortFixText: 'Replace the placeholder NSFaceIDUsageDescription with a real explanation',
           documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsfaceidusagedescription',
         }),
       ];

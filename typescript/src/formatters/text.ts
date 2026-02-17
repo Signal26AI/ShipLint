@@ -18,6 +18,15 @@ async function getChalk() {
   }
   return chalk;
 }
+const BRAND_GREEN = '#10b981';
+function brandColor(c: typeof import('chalk').default): (text: string) => string {
+  try {
+    const fn = c.hex?.(BRAND_GREEN);
+    if (typeof fn === 'function') return fn;
+  } catch { /* fallback */ }
+  return c.green;
+}
+
 
 export interface TextFormatOptions {
   verbose?: boolean;
@@ -82,11 +91,6 @@ function getSeverityColor(c: typeof import('chalk').default, severity: Severity)
   }
 }
 
-function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, maxLength - 3).trimEnd()}...`;
-}
-
 function firstSentence(text: string): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (!normalized) return '';
@@ -103,6 +107,15 @@ function shortExplanation(finding: Finding): string {
   const sentence = firstSentence(finding.description);
   const fallback = finding.description.replace(/\s+/g, ' ').trim();
   return sentence || fallback || 'Needs attention before submission.';
+}
+
+
+function shortFix(finding: Finding): string {
+  if (finding.shortFixText) return finding.shortFixText;
+  if (!finding.fixGuidance?.trim()) return '';
+  // Fallback: extract first sentence from fixGuidance, but never truncate
+  const first = finding.fixGuidance.split('\n')[0].replace(/\s+/g, ' ').trim();
+  return firstSentence(first) || first;
 }
 
 function wrapText(text: string, width: number): string[] {
@@ -132,41 +145,6 @@ function wrapText(text: string, width: number): string[] {
   }
 
   return wrapped;
-}
-
-function boxify(content: string, maxWidth = 70): string[] {
-  const rawLines = content
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .filter((line) => line.trim().length > 0);
-
-  if (rawLines.length === 0) {
-    return [];
-  }
-
-  // Wrap long lines instead of truncating
-  const wrappedLines: string[] = [];
-  for (const line of rawLines) {
-    if (line.length <= maxWidth) {
-      wrappedLines.push(line);
-    } else if (line.trimStart().startsWith('<')) {
-      // XML/code lines: don't word-wrap, just allow full width
-      wrappedLines.push(line);
-    } else {
-      // Word-wrap prose lines
-      for (const wl of wrapText(line, maxWidth)) {
-        wrappedLines.push(wl);
-      }
-    }
-  }
-
-  const width = Math.max(...wrappedLines.map((line) => line.length), maxWidth);
-
-  const top = `┌${'─'.repeat(width + 2)}┐`;
-  const middle = wrappedLines.map((line) => `│ ${line.padEnd(width, ' ')} │`);
-  const bottom = `└${'─'.repeat(width + 2)}┘`;
-
-  return [top, ...middle, bottom];
 }
 
 function displayProjectName(projectPath: string): string {
@@ -220,22 +198,21 @@ async function formatFinding(finding: Finding, verbose: boolean): Promise<string
   lines.push(`    ${color(`→ ${shortExplanation(finding)}`)}`);
 
   if (!verbose) {
-    return lines;
-  }
-
-  const fullDescription = finding.description.replace(/\s+/g, ' ').trim();
-  if (fullDescription) {
-    lines.push('');
-    for (const wrappedLine of wrapText(fullDescription, 76)) {
-      lines.push(wrappedLine ? `    ${wrappedLine}` : '');
+    if (finding.severity === Severity.Critical && (finding.shortFixText || finding.fixGuidance?.trim())) {
+      lines.push(`    ${c.cyan(`Fix: ${shortFix(finding)}`)}`);
     }
+    return lines;
   }
 
   if (finding.fixGuidance.trim()) {
     lines.push('');
-    lines.push('    Suggested fix:');
-    for (const boxLine of boxify(finding.fixGuidance, 68)) {
-      lines.push(`    ${boxLine}`);
+    lines.push('    Fix:');
+    // Extract just the code/action lines from fixGuidance (skip prose)
+    const fixLines = finding.fixGuidance.split('\n')
+      .map((l: string) => l.trimEnd())
+      .filter((l: string) => l.trim().length > 0);
+    for (const fixLine of fixLines) {
+      lines.push(`    │ ${fixLine}`);
     }
   }
 
@@ -269,7 +246,7 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
   const warningCount = result.findings.filter((finding) => finding.severity === Severity.Medium).length;
 
   const lines: string[] = [];
-  lines.push(`ShipLint v${version} — scanning ${displayProjectName(result.projectPath)}`);
+  lines.push(`${brandColor(c)(`ShipLint v${version}`)} — scanning ${displayProjectName(result.projectPath)}`);
   if (verbose) {
     lines.push(c.dim(`  ${result.timestamp.toISOString()} · ${result.duration}ms · ${result.rulesRun.length} rules`));
   }
@@ -281,7 +258,11 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
     const finding = sortedFindings[i];
     lines.push(...(await formatFinding(finding, verbose)));
     if (i < sortedFindings.length - 1) {
-      lines.push('');
+      if (verbose) {
+        lines.push('────────────────────────────────────────');
+      } else {
+        lines.push('');
+      }
     }
   }
 
@@ -292,10 +273,12 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
   const parts: string[] = [];
   if (errorCount > 0) parts.push(c.red(`${errorCount} error${errorCount === 1 ? '' : 's'}`));
   if (warningCount > 0) parts.push(c.yellow(`${warningCount} warning${warningCount === 1 ? '' : 's'}`));
-  if (parts.length === 0) parts.push(c.green('No issues found'));
+  if (errorCount === 0 && warningCount === 0) parts.push(brandColor(c)('No issues found'));
+  if (passedCount > 0) parts.push(brandColor(c)(`${passedCount} passed`));
   lines.push(parts.join(' \u00b7 '));
 
-  if (errorCount > 0) {
+  if (sortedFindings.length > 0) {
+    lines.push(c.dim('  Run shiplint scan --verbose for details'));
   }
 
   return lines.join('\n');

@@ -169,6 +169,7 @@ export const DynamicCodeExecutionRule: Rule = {
             location: relFile,
             line: det.line,
             fixGuidance: 'If using JavaScriptCore for app logic, ensure scripts are bundled with the app binary, not downloaded at runtime. Consider using native Swift/ObjC instead.',
+            shortFixText: 'Bundle JavaScript with the app binary instead of downloading scripts at runtime',
           }));
           break;
         case 'dlopen':
@@ -179,6 +180,7 @@ export const DynamicCodeExecutionRule: Rule = {
             location: relFile,
             line: det.line,
             fixGuidance: 'Remove dlopen/dlsym calls. Link frameworks at build time instead of loading them dynamically at runtime.',
+            shortFixText: 'Remove dlopen/dlsym calls and link frameworks at build time instead',
           }));
           break;
         case 'nsclass-suspicious':
@@ -188,6 +190,7 @@ export const DynamicCodeExecutionRule: Rule = {
             location: relFile,
             line: det.line,
             fixGuidance: 'Use direct class references instead of NSClassFromString where possible. If used for optional framework detection, ensure the class is from a public Apple framework.',
+            shortFixText: 'Use direct class references instead of NSClassFromString where possible',
           }));
           break;
         case 'bundle-load':
@@ -197,6 +200,7 @@ export const DynamicCodeExecutionRule: Rule = {
             location: relFile,
             line: det.line,
             fixGuidance: 'Link frameworks at build time. If loading resource bundles (not code), this is fine — verify the bundle contains only resources.',
+            shortFixText: 'Link frameworks at build time instead of loading bundles dynamically at runtime',
           }));
           break;
       }

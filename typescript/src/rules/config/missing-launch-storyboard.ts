@@ -79,6 +79,7 @@ If you're using a SwiftUI app lifecycle, set it to an empty string — Xcode typ
 
 Note: Launch images (UILaunchImages / asset catalog launch images) are no longer accepted ` +
           `as a substitute for launch storyboards.`,
+        shortFixText: 'Add UILaunchStoryboardName to Info.plist',
         documentationURL: 'https://developer.apple.com/documentation/bundleresources/information_property_list/uilaunchstoryboardname',
       }),
     ];

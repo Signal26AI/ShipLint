@@ -99,6 +99,7 @@ Good example: "Allow tracking to receive personalized ads based on your interest
 Bad example: "" or "For tracking"
 
 Be specific about what data is collected and how it's used.`,
+        shortFixText: 'Replace the empty NSUserTrackingUsageDescription with a meaningful explanation',
         documentationURL: 'https://developer.apple.com/documentation/apptrackingtransparency',
       }));
     }
@@ -114,6 +115,7 @@ Be specific about what data is collected and how it's used.`,
 Current value: "${trackingDescription}"
 
 Users should understand what tracking means for their privacy.`,
+        shortFixText: 'Replace the placeholder NSUserTrackingUsageDescription with a real explanation',
         documentationURL: 'https://developer.apple.com/documentation/apptrackingtransparency',
       }));
     }
@@ -137,6 +139,7 @@ ATTrackingManager.requestTrackingAuthorization { status in
 
 Note: If you're using a different approach to ATT (like via a third-party SDK wrapper), ` +
           `you can ignore this finding.`,
+        shortFixText: 'Link the AppTrackingTransparency framework and implement the ATT permission prompt',
         documentationURL: 'https://developer.apple.com/documentation/apptrackingtransparency',
       }));
     }
