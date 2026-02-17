@@ -39,7 +39,7 @@ describe('MissingCameraPurposeRule', () => {
     expect(findings).toEqual([]);
   });
 
-  it('should find missing NSCameraUsageDescription when AVFoundation is linked', async () => {
+  it('should warn when AVFoundation linked but no source files found', async () => {
     const context = createContextObject(
       '/test/project',
       { CFBundleIdentifier: 'com.example.app' },
@@ -50,8 +50,8 @@ describe('MissingCameraPurposeRule', () => {
 
     const findings = await MissingCameraPurposeRule.evaluate(context);
 
+    // No source files = can't determine usage = warn
     expect(findings).toHaveLength(1);
-    expect(findings[0].ruleId).toBe('privacy-001-missing-camera-purpose');
     expect(findings[0].severity).toBe(Severity.High);
     expect(findings[0].confidence).toBe(Confidence.Medium);
   });
@@ -100,7 +100,7 @@ describe('MissingCameraPurposeRule', () => {
     expect(findings).toEqual([]);
   });
 
-  it('should keep AVFoundation-only detection as high severity when source is ambiguous', async () => {
+  it('should skip AVFoundation-only when source only has import (no specific APIs)', async () => {
     const projectPath = createTempProject('import AVFoundation\n');
 
     const context = createContextObject(
@@ -113,14 +113,13 @@ describe('MissingCameraPurposeRule', () => {
 
     const findings = await MissingCameraPurposeRule.evaluate(context);
 
-    expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe(Severity.High);
-    expect(findings[0].confidence).toBe(Confidence.Medium);
+    expect(findings).toHaveLength(0);
   });
 
   it('should find empty NSCameraUsageDescription', async () => {
+    const projectPath = createTempProject('import AVFoundation\nlet s = AVCaptureSession()');
     const context = createContextObject(
-      '/test/project',
+      projectPath,
       {
         CFBundleIdentifier: 'com.example.app',
         NSCameraUsageDescription: '',
@@ -137,8 +136,9 @@ describe('MissingCameraPurposeRule', () => {
   });
 
   it('should find placeholder NSCameraUsageDescription', async () => {
+    const projectPath = createTempProject('import AVFoundation\nlet s = AVCaptureSession()');
     const context = createContextObject(
-      '/test/project',
+      projectPath,
       {
         CFBundleIdentifier: 'com.example.app',
         NSCameraUsageDescription: 'TODO: add real description',

@@ -50,12 +50,10 @@ export const MissingCameraPurposeRule: Rule = {
       return [];
     }
 
-    // AVFoundation-only projects that only use playback (or microphone-only APIs)
-    // should not be flagged for camera permission.
-    if (
-      hasOnlyAVFoundation &&
-      (hasPlaybackOnlyUsage || (hasMicrophoneSpecificUsage && !hasCameraSpecificUsage))
-    ) {
+    // AVFoundation-only: skip if we found source files and none use camera APIs
+    // If no source files found at all, warn (we can't determine usage)
+    const hasAnySourceSignal = sourceUsage.hasAVFoundationImport || sourceUsage.hasPlaybackUsage || sourceUsage.hasMicrophoneSpecificUsage;
+    if (hasOnlyAVFoundation && !hasCameraSpecificUsage && hasAnySourceSignal) {
       return [];
     }
 
