@@ -9,13 +9,16 @@
 import type { Rule, Finding, ScanContext } from '../../types/index.js';
 import { Severity, Confidence, RuleCategory } from '../../types/index.js';
 import { isPlaceholder } from '../../parsers/plist-parser.js';
-import { makeFinding } from '../base.js';
+import { makeFinding, makeCustomFinding } from '../base.js';
 
 // Note: VisionKit is NOT included here because it's often used for ImageAnalyzer
 // (Live Text on existing images) which doesn't require camera access. Only
 // DataScannerViewController and VNDocumentCameraViewController in VisionKit
 // require camera permission, and detecting those requires deeper source analysis.
-const CAMERA_FRAMEWORKS = ['AVFoundation', 'AVKit'];
+// Frameworks that specifically require camera access
+const CAMERA_SPECIFIC_FRAMEWORKS = ['AVKit'];
+// AVFoundation is used for both camera AND playback - flag with lower confidence
+const CAMERA_FRAMEWORKS = ['AVFoundation', ...CAMERA_SPECIFIC_FRAMEWORKS];
 
 export const MissingCameraPurposeRule: Rule = {
   id: 'privacy-001-missing-camera-purpose',
@@ -41,13 +44,22 @@ export const MissingCameraPurposeRule: Rule = {
 
     const cameraDescription = context.plistString('NSCameraUsageDescription');
 
+    // AVFoundation alone is ambiguous - used for playback too
+    const hasOnlyAVFoundation = detectedFrameworks.length === 1 && detectedFrameworks[0] === 'AVFoundation';
+    const confidenceLevel = hasOnlyAVFoundation ? Confidence.Medium : Confidence.High;
+    const severityLevel = hasOnlyAVFoundation ? Severity.High : this.severity;
+    const avFoundationCaveat = hasOnlyAVFoundation
+      ? '\n\nNote: AVFoundation is commonly used for audio/video playback. If your app only plays media and doesn\'t capture photos or video, you may not need this permission.'
+      : '';
+
     // Case 1: Completely missing
     if (cameraDescription === undefined) {
       return [
-        makeFinding(this, {
+        makeCustomFinding(this, severityLevel, confidenceLevel, {
+          title: 'Missing Camera Usage Description',
           description: `Your app links against camera-related frameworks (${detectedFrameworks.join(', ')}) ` +
             `but Info.plist is missing NSCameraUsageDescription. Apps that access the camera must ` +
-            `provide a purpose string explaining why access is needed.`,
+            `provide a purpose string explaining why access is needed.${avFoundationCaveat}`,
           location: context.infoPlistPath || 'Info.plist',
           fixGuidance: `Add NSCameraUsageDescription to your Info.plist with a clear, user-facing explanation ` +
             `of why your app needs camera access. For example:

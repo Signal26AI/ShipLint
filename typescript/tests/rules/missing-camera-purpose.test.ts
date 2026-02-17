@@ -33,8 +33,8 @@ describe('MissingCameraPurposeRule', () => {
     
     expect(findings).toHaveLength(1);
     expect(findings[0].ruleId).toBe('privacy-001-missing-camera-purpose');
-    expect(findings[0].severity).toBe(Severity.Critical);
-    expect(findings[0].confidence).toBe(Confidence.High);
+    expect(findings[0].severity).toBe(Severity.High);
+    expect(findings[0].confidence).toBe(Confidence.Medium);
   });
 
   it('should find empty NSCameraUsageDescription', async () => {
