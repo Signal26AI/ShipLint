@@ -1,9 +1,11 @@
 /**
  * Text formatter for human-readable output
- * v1.4: Ship verdict, severity grouping, scanner breakdown
+ * v1.5: Rust-style diagnostics + verdict banner + severity grouping
  */
+import * as fs from 'fs';
+import * as path from 'path';
 import type { ScanResult, Finding } from '../types/index.js';
-import { Severity, Confidence } from '../types/index.js';
+import { Severity } from '../types/index.js';
 
 // Dynamic import for chalk (ESM)
 let chalk: typeof import('chalk').default;
@@ -35,20 +37,6 @@ function getSeverityColor(severity: Severity): (text: string) => string {
 }
 
 /**
- * Get confidence label
- */
-function getConfidenceLabel(confidence: Confidence): string {
-  switch (confidence) {
-    case Confidence.High:
-      return 'high confidence';
-    case Confidence.Medium:
-      return 'medium confidence';
-    case Confidence.Low:
-      return 'low confidence';
-  }
-}
-
-/**
  * Severity sort order
  */
 const SEVERITY_ORDER: Record<string, number> = {
@@ -59,60 +47,152 @@ const SEVERITY_ORDER: Record<string, number> = {
   info: 4,
 };
 
-/**
- * Format a single finding
- */
-async function formatFinding(finding: Finding, index: number): Promise<string> {
-  const c = await getChalk();
-  const severityColor = getSeverityColor(finding.severity);
-  
-  const lines: string[] = [];
-  
-  // Header
-  lines.push(
-    `${c.bold(`${index + 1}.`)} ${severityColor(`[${finding.severity.toUpperCase()}]`)} ${c.bold(finding.title)}`
-  );
-  
-  // Location and guideline
-  const meta: string[] = [];
-  if (finding.location) {
-    meta.push(`📍 ${finding.location}`);
+const SOURCE_CACHE = new Map<string, string[]>();
+
+function isReadableFile(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
   }
-  meta.push(`🧩 Rule ${finding.ruleId}`);
-  meta.push(`📋 Guideline ${finding.guideline}`);
-  meta.push(`🎯 ${getConfidenceLabel(finding.confidence)}`);
-  lines.push(c.dim(`   ${meta.join(' • ')}`));
-  
-  // Description
-  lines.push('');
-  lines.push(c.white(`   ${finding.description}`));
-  
-  // Fix guidance
-  lines.push('');
-  lines.push(c.green.bold('   How to fix:'));
-  for (const line of finding.fixGuidance.split('\n')) {
-    lines.push(c.green(`   ${line}`));
-  }
-  
-  // Documentation URL
-  if (finding.documentationURL) {
-    lines.push('');
-    lines.push(c.cyan(`   📚 ${finding.documentationURL}`));
-  }
-  
-  return lines.join('\n');
 }
 
-/**
- * Get scanner name from rule ID
- */
-function getScannerFromRuleId(ruleId: string): string {
-  if (ruleId.startsWith('privacy-')) return 'Privacy';
-  if (ruleId.startsWith('auth-')) return 'Auth';
-  if (ruleId.startsWith('metadata-')) return 'Metadata';
-  if (ruleId.startsWith('config-')) return 'Config';
-  if (ruleId.startsWith('code-')) return 'Code Analysis';
-  return 'Other';
+function resolveLocationPath(projectPath: string, location: string): string | undefined {
+  if (path.isAbsolute(location) && isReadableFile(location)) {
+    return location;
+  }
+
+  const candidates = [
+    path.resolve(projectPath, location),
+    path.resolve(process.cwd(), location),
+  ];
+
+  for (const candidate of candidates) {
+    if (isReadableFile(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+function getSourceLines(filePath: string): string[] | undefined {
+  if (SOURCE_CACHE.has(filePath)) {
+    return SOURCE_CACHE.get(filePath);
+  }
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const lines = content.split(/\r?\n/);
+    SOURCE_CACHE.set(filePath, lines);
+    return lines;
+  } catch {
+    return undefined;
+  }
+}
+
+function getCaretColumn(lineText: string): number {
+  const firstNonWhitespace = lineText.search(/\S/);
+  if (firstNonWhitespace === -1) return 1;
+  return firstNonWhitespace + 1;
+}
+
+function getCaretLength(lineText: string): number {
+  const trimmed = lineText.trimStart();
+  if (!trimmed) return 1;
+  const firstToken = trimmed.split(/\s+/)[0] || '';
+  return Math.max(1, Math.min(24, firstToken.length));
+}
+
+function displayPath(projectPath: string, location: string): string {
+  if (!path.isAbsolute(location)) {
+    return location;
+  }
+
+  const relative = path.relative(projectPath, location);
+  if (!relative.startsWith('..') && relative !== '') {
+    return relative;
+  }
+
+  return location;
+}
+
+function inferCheckedFileCount(result: ScanResult): number {
+  const locations = new Set<string>();
+  for (const finding of [...result.findings, ...result.suppressedFindings]) {
+    if (finding.location) locations.add(finding.location);
+  }
+  return Math.max(locations.size, 1);
+}
+
+async function formatFinding(finding: Finding, projectPath: string): Promise<string> {
+  const c = await getChalk();
+  const severityColor = getSeverityColor(finding.severity);
+  const severityLabel = finding.severity.toUpperCase();
+  const lines: string[] = [];
+
+  if (finding.location && finding.line) {
+    const sourcePath = resolveLocationPath(projectPath, finding.location);
+    const shownPath = displayPath(projectPath, finding.location);
+
+    let column = 1;
+    let caretLength = 1;
+    let sourceLines: string[] | undefined;
+
+    if (sourcePath) {
+      sourceLines = getSourceLines(sourcePath);
+      const lineText = sourceLines?.[finding.line - 1] ?? '';
+      column = getCaretColumn(lineText);
+      caretLength = getCaretLength(lineText);
+    }
+
+    lines.push(
+      `${c.bold(`${shownPath}:${finding.line}:${column}:`)} ${finding.ruleId} ${severityColor(`[${severityLabel}]`)} ${c.bold(finding.title)}`
+    );
+
+    if (sourceLines && sourceLines[finding.line - 1] !== undefined) {
+      const startLine = Math.max(1, finding.line - 1);
+      const endLine = Math.min(sourceLines.length, finding.line + 1);
+
+      lines.push('  |');
+      for (let lineNumber = startLine; lineNumber <= endLine; lineNumber++) {
+        const text = sourceLines[lineNumber - 1] ?? '';
+        lines.push(`${String(lineNumber).padStart(3, ' ')} | ${text}`);
+        if (lineNumber === finding.line) {
+          lines.push(`    | ${' '.repeat(Math.max(0, column - 1))}${'^'.repeat(caretLength)} ${finding.ruleId}`);
+        }
+      }
+      lines.push('  |');
+    } else {
+      lines.push('  |');
+      lines.push(`  = location: ${shownPath}`);
+      lines.push('  |');
+    }
+
+    const helpLines = finding.fixGuidance.split('\n').filter(Boolean);
+    for (const help of helpLines) {
+      lines.push(c.green(`  = help: ${help}`));
+    }
+    if (finding.documentationURL) {
+      lines.push(c.cyan(`  = docs: ${finding.documentationURL}`));
+    }
+
+    return lines.join('\n');
+  }
+
+  lines.push(`${finding.ruleId} ${severityColor(`[${severityLabel}]`)} ${c.bold(finding.title)}`);
+  if (finding.location) {
+    lines.push(c.dim(`  location: ${displayPath(projectPath, finding.location)}`));
+  }
+  lines.push(`  description: ${finding.description}`);
+  for (const help of finding.fixGuidance.split('\n').filter(Boolean)) {
+    lines.push(c.green(`  help: ${help}`));
+  }
+  if (finding.documentationURL) {
+    lines.push(c.cyan(`  docs: ${finding.documentationURL}`));
+  }
+
+  return lines.join('\n');
 }
 
 /**
@@ -123,7 +203,7 @@ export async function formatText(result: ScanResult): Promise<string> {
   const lines: string[] = [];
   const suppressedCount = result.suppressedFindings?.length ?? 0;
   const suppressedSuffix = suppressedCount > 0 ? ` (${suppressedCount} suppressed)` : '';
-  
+
   // Header
   lines.push(c.bold.underline('\n🛡️  ShipLint Scan Results\n'));
   lines.push(`📁 Project: ${result.projectPath}`);
@@ -134,7 +214,7 @@ export async function formatText(result: ScanResult): Promise<string> {
     lines.push(`🔇 Suppressed: ${suppressedCount}`);
   }
   lines.push('');
-  
+
   // Count by severity
   const bySeverity = new Map<Severity, Finding[]>();
   for (const finding of result.findings) {
@@ -163,67 +243,44 @@ export async function formatText(result: ScanResult): Promise<string> {
     lines.push(c.green.bold('═'.repeat(60)));
     lines.push(c.green.bold(`  ✅  PASS — 0 critical issues. Your app looks ready for review.${suppressedSuffix}`));
     lines.push(c.green.bold('═'.repeat(60)));
-    if (result.findings.length === 0) {
-      lines.push('');
-      return lines.join('\n');
-    }
-  }
-  lines.push('');
-  
-  // Summary by severity
-  lines.push(c.bold('📊 Summary:'));
-  const severityOrder = [Severity.Critical, Severity.High, Severity.Medium, Severity.Low, Severity.Info];
-  for (const severity of severityOrder) {
-    const count = bySeverity.get(severity)?.length ?? 0;
-    if (count > 0) {
-      const color = getSeverityColor(severity);
-      lines.push(`   ${color(`${severity.toUpperCase()}`)}: ${count}`);
-    }
-  }
-  lines.push('');
-
-  // Scanner breakdown
-  const byScanner = new Map<string, Finding[]>();
-  for (const finding of result.findings) {
-    const scanner = getScannerFromRuleId(finding.ruleId);
-    const existing = byScanner.get(scanner) ?? [];
-    existing.push(finding);
-    byScanner.set(scanner, existing);
   }
 
-  lines.push(c.bold('🔧 Scanner Breakdown:'));
-  for (const [scanner, findings] of byScanner.entries()) {
-    const critCount = findings.filter(f => f.severity === Severity.Critical || f.severity === Severity.High).length;
-    const tag = critCount > 0 ? c.red(`(${critCount} critical/high)`) : c.green('(clean)');
-    lines.push(`   ${scanner}: ${findings.length} finding(s) ${tag}`);
-  }
-  lines.push('');
-  
-  // Findings grouped by severity
   const sortedFindings = [...result.findings].sort((a, b) => {
     return SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
   });
 
-  let currentSeverity: Severity | null = null;
-  let findingIndex = 0;
+  if (sortedFindings.length > 0) {
+    lines.push('');
 
-  for (const finding of sortedFindings) {
-    if (finding.severity !== currentSeverity) {
-      currentSeverity = finding.severity;
-      const color = getSeverityColor(currentSeverity);
-      const count = bySeverity.get(currentSeverity)?.length ?? 0;
-      lines.push('');
-      lines.push(color(`${'─'.repeat(60)}`));
-      lines.push(color(`  ${currentSeverity.toUpperCase()} (${count})`));
-      lines.push(color(`${'─'.repeat(60)}`));
+    let currentSeverity: Severity | null = null;
+    for (const finding of sortedFindings) {
+      if (finding.severity !== currentSeverity) {
+        currentSeverity = finding.severity;
+        const color = getSeverityColor(currentSeverity);
+        const count = bySeverity.get(currentSeverity)?.length ?? 0;
+        lines.push('');
+        lines.push(color(`${'─'.repeat(60)}`));
+        lines.push(color(`  ${currentSeverity.toUpperCase()} (${count})`));
+        lines.push(color(`${'─'.repeat(60)}`));
+        lines.push('');
+      }
+
+      lines.push(await formatFinding(finding, result.projectPath));
       lines.push('');
     }
-
-    const formattedFinding = await formatFinding(finding, findingIndex);
-    lines.push(formattedFinding);
-    lines.push('');
-    findingIndex++;
   }
-  
+
+  const criticalHigh = criticalCount + highCount;
+  const medium = mediumCount;
+  const lowInfo = (bySeverity.get(Severity.Low)?.length ?? 0) + (bySeverity.get(Severity.Info)?.length ?? 0);
+  const checkedFiles = inferCheckedFileCount(result);
+
+  lines.push(c.dim('━'.repeat(40)));
+  lines.push(`Checked ${checkedFiles} files in ${result.duration}ms`);
+  lines.push('');
+  lines.push(
+    `  ${c.red(`✖ ${criticalHigh} critical/high`)}    ${c.yellow(`⚠ ${medium} medium`)}    ${c.blue(`ℹ ${lowInfo} low/info`)}`
+  );
+
   return lines.join('\n');
 }
