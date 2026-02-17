@@ -33,7 +33,7 @@ import Footer from '../components/Footer.astro';
         {
           "@type": "Question",
           "name": "Why did Apple reject my app?",
-          "acceptedAnswer": { "@type": "Answer", "text": "According to Apple's 2024 App Store Transparency Report, approximately 25% of app submissions are rejected. The most common reasons include missing privacy manifests (required since iOS 17), incomplete usage description strings, entitlement mismatches, and App Transport Security exceptions without justification. ShipLint checks for the 16 most preventable rejection causes before you submit." }
+          "acceptedAnswer": { "@type": "Answer", "text": "According to Apple's 2024 App Store Transparency Report, approximately 25% of app submissions are rejected. The most common reasons include missing privacy manifests (required since iOS 17), incomplete usage description strings, entitlement mismatches, and App Transport Security exceptions without justification. ShipLint checks for the 18 most preventable rejection causes before you submit." }
         },
         {
           "@type": "Question",
@@ -136,7 +136,7 @@ import Footer from '../components/Footer.astro';
     <!-- STATS BAR -->
     <section class="border-y border-surface-600/50 bg-surface-800/50" aria-label="Key statistics about App Store rejections">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-        <p class="sr-only">According to Apple's 2024 App Store Transparency Report, approximately 25% of app submissions are rejected. Each rejection cycle costs developers 10-30 minutes of upload time alone, not counting the fixes. ShipLint checks 16 rules covering the most preventable rejection causes.</p>
+        <p class="sr-only">According to Apple's 2024 App Store Transparency Report, approximately 25% of app submissions are rejected. Each rejection cycle costs developers 10-30 minutes of upload time alone, not counting the fixes. ShipLint checks 18 rules covering the most preventable rejection causes.</p>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-12 text-center">
           <div>
             <div class="stat-number text-4xl sm:text-5xl font-extrabold text-white mb-2">~25%</div>
@@ -147,7 +147,7 @@ import Footer from '../components/Footer.astro';
             <p class="text-muted text-sm leading-relaxed">wasted per upload/rejection cycle<br><span class="text-xs text-surface-500">before you even start fixing</span></p>
           </div>
           <div>
-            <div class="stat-number text-4xl sm:text-5xl font-extrabold text-white mb-2">16 rules</div>
+            <div class="stat-number text-4xl sm:text-5xl font-extrabold text-white mb-2">18 rules</div>
             <p class="text-muted text-sm leading-relaxed">covering the most preventable<br><span class="text-xs text-surface-500">App Store rejection causes</span></p>
           </div>
         </div>
@@ -189,7 +189,7 @@ import Footer from '../components/Footer.astro';
         <div class="text-center mb-4">
           <h2 id="catches-heading" class="text-3xl sm:text-4xl font-bold mb-4">What ShipLint Catches</h2>
           <p class="text-muted text-lg max-w-2xl mx-auto mb-2">
-            16 rules targeting the most common App Store rejection causes — the "surprise" errors that AI-generated code doesn't know to avoid.
+            18 rules targeting the most common App Store rejection causes — the "surprise" errors that AI-generated code doesn't know to avoid.
           </p>
           <p class="text-xs text-surface-500 max-w-xl mx-auto">
             Each rule maps to a specific Apple guideline or ITMS error code. ShipLint tells you exactly what's wrong and how to fix it.
@@ -305,7 +305,7 @@ import Footer from '../components/Footer.astro';
                 <li>• <strong class="text-white">Entitlement mismatches</strong> (<code class="text-red-400 text-xs">ITMS-90078</code>) — capabilities in code that don't match your provisioning profile</li>
                 <li>• <strong class="text-white">App Transport Security exceptions</strong> without written justification</li>
               </ul>
-              <p class="mt-3">ShipLint checks for all 16 of the most preventable rejection causes before you submit.</p>
+              <p class="mt-3">ShipLint checks for all 18 of the most preventable rejection causes before you submit.</p>
             </div>
           </details>
           <details class="bg-surface-700 border border-surface-600 rounded-xl group">
