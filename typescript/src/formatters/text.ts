@@ -1,11 +1,12 @@
 /**
  * Text formatter for human-readable output
- * v1.5: Rust-style diagnostics + verdict banner + severity grouping
+ * Final CLI design: compact, confidence-building, and actionable.
  */
-import * as fs from 'fs';
 import * as path from 'path';
 import type { ScanResult, Finding } from '../types/index.js';
 import { Severity } from '../types/index.js';
+import { allRules } from '../rules/index.js';
+import packageJson from '../../package.json';
 
 // Dynamic import for chalk (ESM)
 let chalk: typeof import('chalk').default;
@@ -18,278 +19,284 @@ async function getChalk() {
   return chalk;
 }
 
-/**
- * Get severity color
- */
-function getSeverityColor(severity: Severity): (text: string) => string {
-  switch (severity) {
-    case Severity.Critical:
-      return (text) => chalk.red.bold(text);
-    case Severity.High:
-      return (text) => chalk.red(text);
-    case Severity.Medium:
-      return (text) => chalk.yellow(text);
-    case Severity.Low:
-      return (text) => chalk.blue(text);
-    case Severity.Info:
-      return (text) => chalk.gray(text);
-  }
+export interface TextFormatOptions {
+  verbose?: boolean;
+  version?: string;
 }
 
-/**
- * Severity sort order
- */
-const SEVERITY_ORDER: Record<string, number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-  info: 4,
+const FINDING_ORDER: Record<Severity, number> = {
+  [Severity.Critical]: 0,
+  [Severity.High]: 1,
+  [Severity.Medium]: 2,
+  [Severity.Low]: 3,
+  [Severity.Info]: 4,
 };
 
-const SOURCE_CACHE = new Map<string, string[]>();
+const RULE_NAME_BY_ID = new Map(allRules.map((rule) => [rule.id, rule.name]));
 
-function isReadableFile(filePath: string): boolean {
-  try {
-    return fs.statSync(filePath).isFile();
-  } catch {
-    return false;
+const PASSED_LABEL_OVERRIDES: Record<string, string> = {
+  'privacy-001-missing-camera-purpose': 'Camera usage description present',
+  'privacy-002-missing-location-purpose': 'Location usage descriptions present',
+  'privacy-003-att-tracking-mismatch': 'Tracking transparency configuration consistent',
+  'privacy-004-missing-photo-library-purpose': 'Photo library usage description present',
+  'privacy-005-missing-microphone-purpose': 'Microphone usage description present',
+  'privacy-006-missing-contacts-purpose': 'Contacts usage description present',
+  'privacy-007-location-always-unjustified': 'Location Always access has justification',
+  'privacy-008-missing-bluetooth-purpose': 'Bluetooth usage description present',
+  'privacy-009-missing-face-id-purpose': 'Face ID usage description present',
+  'privacy-010-required-reason-api': 'Required-reason API declarations present',
+  'auth-001-third-party-login-no-siwa': 'Sign in with Apple compliance OK',
+  'metadata-001-missing-privacy-manifest': 'Privacy manifest assets present',
+  'metadata-002-missing-supported-orientations': 'Supported orientations configured',
+  'config-001-ats-exception-without-justification': 'ATS exceptions justified',
+  'config-002-missing-encryption-flag': 'Export compliance flag configured',
+  'config-003-missing-launch-storyboard': 'Launch storyboard configured',
+  'code-001-private-api-usage': 'No private API usage detected',
+  'code-003-dynamic-code-execution': 'No dynamic code execution detected',
+};
+
+function getIconForSeverity(severity: Severity): string {
+  switch (severity) {
+    case Severity.Critical:
+    case Severity.High:
+      return '✖';
+    case Severity.Medium:
+      return '△';
+    case Severity.Low:
+    case Severity.Info:
+      return 'ℹ';
   }
 }
 
-function resolveLocationPath(projectPath: string, location: string): string | undefined {
-  if (path.isAbsolute(location) && isReadableFile(location)) {
-    return location;
-  }
-
-  const candidates = [
-    path.resolve(projectPath, location),
-    path.resolve(process.cwd(), location),
-  ];
-
-  for (const candidate of candidates) {
-    if (isReadableFile(candidate)) {
-      return candidate;
-    }
-  }
-
-  return undefined;
-}
-
-function getSourceLines(filePath: string): string[] | undefined {
-  if (SOURCE_CACHE.has(filePath)) {
-    return SOURCE_CACHE.get(filePath);
-  }
-
-  try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const lines = content.split(/\r?\n/);
-    SOURCE_CACHE.set(filePath, lines);
-    return lines;
-  } catch {
-    return undefined;
+function getSeverityColor(c: typeof import('chalk').default, severity: Severity): (text: string) => string {
+  switch (severity) {
+    case Severity.Critical:
+      return c.red.bold;
+    case Severity.High:
+      return c.red;
+    case Severity.Medium:
+      return c.yellow;
+    case Severity.Low:
+    case Severity.Info:
+      return c.blue;
   }
 }
 
-function getCaretColumn(lineText: string): number {
-  const firstNonWhitespace = lineText.search(/\S/);
-  if (firstNonWhitespace === -1) return 1;
-  return firstNonWhitespace + 1;
+function truncate(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
-function getCaretLength(lineText: string): number {
-  const trimmed = lineText.trimStart();
-  if (!trimmed) return 1;
-  const firstToken = trimmed.split(/\s+/)[0] || '';
-  return Math.max(1, Math.min(24, firstToken.length));
-}
+function firstSentence(text: string): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
 
-function displayPath(projectPath: string, location: string): string {
-  if (!path.isAbsolute(location)) {
-    return location;
+  const sentenceMatch = normalized.match(/^(.+?[.!?])(?=\s|$)/);
+  if (sentenceMatch) {
+    return sentenceMatch[1];
   }
 
-  const relative = path.relative(projectPath, location);
-  if (!relative.startsWith('..') && relative !== '') {
-    return relative;
-  }
-
-  return location;
+  return normalized;
 }
 
-function inferCheckedFileCount(result: ScanResult): number {
-  const locations = new Set<string>();
-  for (const finding of [...result.findings, ...result.suppressedFindings]) {
-    if (finding.location) locations.add(finding.location);
-  }
-  return Math.max(locations.size, 1);
+function shortExplanation(finding: Finding): string {
+  const sentence = firstSentence(finding.description);
+  const fallback = finding.description.replace(/\s+/g, ' ').trim();
+  return sentence || fallback || 'Needs attention before submission.';
 }
 
-function getTerminalWidth(): number {
-  return Math.min(process.stdout.columns || 80, 100);
-}
+function wrapText(text: string, width: number): string[] {
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
 
-function separator(char: string): string {
-  return char.repeat(getTerminalWidth());
-}
+  const wrapped: string[] = [];
 
-async function formatFinding(finding: Finding, projectPath: string): Promise<string> {
-  const c = await getChalk();
-  const severityColor = getSeverityColor(finding.severity);
-  const severityLabel = finding.severity.toUpperCase();
-  const lines: string[] = [];
+  for (let pIndex = 0; pIndex < paragraphs.length; pIndex++) {
+    const words = paragraphs[pIndex].split(' ');
+    let line = '';
 
-  if (finding.location && finding.line) {
-    const sourcePath = resolveLocationPath(projectPath, finding.location);
-    const shownPath = displayPath(projectPath, finding.location);
-
-    let column = 1;
-    let caretLength = 1;
-    let sourceLines: string[] | undefined;
-
-    if (sourcePath) {
-      sourceLines = getSourceLines(sourcePath);
-      const lineText = sourceLines?.[finding.line - 1] ?? '';
-      column = getCaretColumn(lineText);
-      caretLength = getCaretLength(lineText);
-    }
-
-    lines.push(
-      `${c.bold(`${shownPath}:${finding.line}:${column}:`)} ${finding.ruleId} ${severityColor(`[${severityLabel}]`)} ${c.bold(finding.title)}`
-    );
-
-    if (sourceLines && sourceLines[finding.line - 1] !== undefined) {
-      const startLine = Math.max(1, finding.line - 1);
-      const endLine = Math.min(sourceLines.length, finding.line + 1);
-
-      lines.push('  |');
-      for (let lineNumber = startLine; lineNumber <= endLine; lineNumber++) {
-        const text = sourceLines[lineNumber - 1] ?? '';
-        lines.push(`${String(lineNumber).padStart(3, ' ')} | ${text}`);
-        if (lineNumber === finding.line) {
-          lines.push(`    | ${' '.repeat(Math.max(0, column - 1))}${'^'.repeat(caretLength)} ${finding.ruleId}`);
-        }
+    for (const word of words) {
+      const next = line ? `${line} ${word}` : word;
+      if (next.length <= width) {
+        line = next;
+      } else {
+        if (line) wrapped.push(line);
+        line = word;
       }
-      lines.push('  |');
+    }
+
+    if (line) wrapped.push(line);
+    if (pIndex < paragraphs.length - 1) wrapped.push('');
+  }
+
+  return wrapped;
+}
+
+function boxify(content: string, maxWidth = 70): string[] {
+  const rawLines = content
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim().length > 0);
+
+  if (rawLines.length === 0) {
+    return [];
+  }
+
+  // Wrap long lines instead of truncating
+  const wrappedLines: string[] = [];
+  for (const line of rawLines) {
+    if (line.length <= maxWidth) {
+      wrappedLines.push(line);
+    } else if (line.trimStart().startsWith('<')) {
+      // XML/code lines: don't word-wrap, just allow full width
+      wrappedLines.push(line);
     } else {
-      lines.push('  |');
-      lines.push(`  = location: ${shownPath}`);
-      lines.push('  |');
+      // Word-wrap prose lines
+      for (const wl of wrapText(line, maxWidth)) {
+        wrappedLines.push(wl);
+      }
     }
-
-    const helpLines = finding.fixGuidance.split('\n').filter(Boolean);
-    for (const help of helpLines) {
-      lines.push(c.green(`  = help: ${help}`));
-    }
-    if (finding.documentationURL) {
-      lines.push(c.cyan(`  = docs: ${finding.documentationURL}`));
-    }
-
-    return lines.join('\n');
   }
 
-  lines.push(`${finding.ruleId} ${severityColor(`[${severityLabel}]`)} ${c.bold(finding.title)}`);
-  if (finding.location) {
-    lines.push(c.dim(`  location: ${displayPath(projectPath, finding.location)}`));
+  const width = Math.max(...wrappedLines.map((line) => line.length), maxWidth);
+
+  const top = `┌${'─'.repeat(width + 2)}┐`;
+  const middle = wrappedLines.map((line) => `│ ${line.padEnd(width, ' ')} │`);
+  const bottom = `└${'─'.repeat(width + 2)}┘`;
+
+  return [top, ...middle, bottom];
+}
+
+function displayProjectName(projectPath: string): string {
+  const input = projectPath.trim();
+  const target = input === '.' ? process.cwd() : input;
+  const normalized = path.resolve(target);
+  return path.basename(normalized) || projectPath;
+}
+
+function fallbackPassedLabel(ruleId: string): string {
+  const ruleName = RULE_NAME_BY_ID.get(ruleId) ?? ruleId;
+
+  if (ruleName.startsWith('Missing ')) {
+    return `${ruleName.replace(/^Missing\s+/, '')} present`;
   }
-  lines.push(`  description: ${finding.description}`);
-  for (const help of finding.fixGuidance.split('\n').filter(Boolean)) {
-    lines.push(c.green(`  help: ${help}`));
+
+  if (ruleName.includes(' Without ')) {
+    return `${ruleName.replace(' Without ', ' with ')} OK`;
   }
+
+  return `${ruleName} OK`;
+}
+
+function passedLabel(ruleId: string): string {
+  return PASSED_LABEL_OVERRIDES[ruleId] ?? fallbackPassedLabel(ruleId);
+}
+
+function getPassedRuleIds(result: ScanResult): string[] {
+  const failing = new Set(result.findings.map((finding) => finding.ruleId));
+  const seen = new Set<string>();
+  const passed: string[] = [];
+
+  for (const ruleId of result.rulesRun) {
+    if (seen.has(ruleId)) continue;
+    seen.add(ruleId);
+    if (!failing.has(ruleId)) {
+      passed.push(ruleId);
+    }
+  }
+
+  return passed;
+}
+
+async function formatFinding(finding: Finding, verbose: boolean): Promise<string[]> {
+  const c = await getChalk();
+  const color = getSeverityColor(c, finding.severity);
+  const icon = getIconForSeverity(finding.severity);
+
+  const lines: string[] = [];
+  lines.push(`  ${color(`${icon} ${finding.title}`)}`);
+  lines.push(`    ${color(`→ ${shortExplanation(finding)}`)}`);
+
+  if (!verbose) {
+    return lines;
+  }
+
+  const fullDescription = finding.description.replace(/\s+/g, ' ').trim();
+  if (fullDescription) {
+    lines.push('');
+    for (const wrappedLine of wrapText(fullDescription, 76)) {
+      lines.push(wrappedLine ? `    ${wrappedLine}` : '');
+    }
+  }
+
+  if (finding.fixGuidance.trim()) {
+    lines.push('');
+    lines.push('    Suggested fix:');
+    for (const boxLine of boxify(finding.fixGuidance, 68)) {
+      lines.push(`    ${boxLine}`);
+    }
+  }
+
   if (finding.documentationURL) {
-    lines.push(c.cyan(`  docs: ${finding.documentationURL}`));
+    lines.push('');
+    lines.push(`    → ${finding.documentationURL}`);
   }
 
-  return lines.join('\n');
+  return lines;
 }
 
 /**
  * Format scan results as text
  */
-export async function formatText(result: ScanResult): Promise<string> {
+export async function formatText(result: ScanResult, options: TextFormatOptions = {}): Promise<string> {
   const c = await getChalk();
-  const lines: string[] = [];
-  const suppressedCount = result.suppressedFindings?.length ?? 0;
-  const suppressedSuffix = suppressedCount > 0 ? ` (${suppressedCount} suppressed)` : '';
+  const verbose = options.verbose ?? false;
+  const version = options.version ?? packageJson.version;
 
-  // Header
-  lines.push(c.bold.underline('\n🛡️  ShipLint Scan Results\n'));
-  lines.push(`📁 Project: ${result.projectPath}`);
-  lines.push(`🕐 Scanned: ${result.timestamp.toISOString()}`);
-  lines.push(`⏱️  Duration: ${result.duration}ms`);
-  lines.push(`📊 Rules run: ${result.rulesRun.length}`);
-  if (suppressedCount > 0) {
-    lines.push(`🔇 Suppressed: ${suppressedCount}`);
+  const sortedFindings = [...result.findings].sort((a, b) => {
+    const bySeverity = FINDING_ORDER[a.severity] - FINDING_ORDER[b.severity];
+    if (bySeverity !== 0) return bySeverity;
+    return a.title.localeCompare(b.title);
+  });
+
+  const passedRuleIds = getPassedRuleIds(result);
+  const passedCount = Math.max(0, result.rulesRun.length - new Set(result.findings.map((f) => f.ruleId)).size);
+  const errorCount = result.findings.filter(
+    (finding) => finding.severity === Severity.Critical || finding.severity === Severity.High
+  ).length;
+  const warningCount = result.findings.filter((finding) => finding.severity === Severity.Medium).length;
+
+  const lines: string[] = [];
+  lines.push(`ShipLint v${version} — scanning ${displayProjectName(result.projectPath)}`);
+  if (verbose) {
+    lines.push(c.dim(`  ${result.timestamp.toISOString()} · ${result.duration}ms · ${result.rulesRun.length} rules`));
   }
   lines.push('');
 
-  // Count by severity
-  const bySeverity = new Map<Severity, Finding[]>();
-  for (const finding of result.findings) {
-    const existing = bySeverity.get(finding.severity) ?? [];
-    existing.push(finding);
-    bySeverity.set(finding.severity, existing);
-  }
 
-  const criticalCount = bySeverity.get(Severity.Critical)?.length ?? 0;
-  const highCount = bySeverity.get(Severity.High)?.length ?? 0;
-  const mediumCount = bySeverity.get(Severity.Medium)?.length ?? 0;
 
-  // ═══ SHIP VERDICT ═══
-  if (criticalCount > 0) {
-    lines.push(c.red.bold(separator('═')));
-    lines.push(c.red.bold(`  🚫 BLOCKED — ${criticalCount} issue(s) will cause App Store rejection${suppressedSuffix}`));
-    lines.push(c.red.bold(separator('═')));
-  } else if (highCount > 0) {
-    lines.push(c.yellow.bold(separator('═')));
-    lines.push(c.yellow.bold(`  ⚠️ WARNING — ${highCount} issue(s) likely to cause rejection${suppressedSuffix}`));
-    lines.push(c.yellow.bold(separator('═')));
-  } else if (result.findings.length > 0) {
-    lines.push(c.blue.bold(separator('═')));
-    lines.push(c.blue.bold(`  💡 ${result.findings.length} suggestion(s) to improve your submission${suppressedSuffix}`));
-    lines.push(c.blue.bold(separator('═')));
-  } else {
-    lines.push(c.green.bold(separator('═')));
-    lines.push(c.green.bold(`  ✅ READY — No issues found${suppressedSuffix}`));
-    lines.push(c.green.bold(separator('═')));
-  }
-
-  const sortedFindings = [...result.findings].sort((a, b) => {
-    return SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
-  });
-
-  if (sortedFindings.length > 0) {
-    lines.push('');
-
-    let currentSeverity: Severity | null = null;
-    for (const finding of sortedFindings) {
-      if (finding.severity !== currentSeverity) {
-        currentSeverity = finding.severity;
-        const color = getSeverityColor(currentSeverity);
-        const count = bySeverity.get(currentSeverity)?.length ?? 0;
-        lines.push('');
-        lines.push(color(separator('─')));
-        lines.push(color(`  ${currentSeverity.toUpperCase()} (${count})`));
-        lines.push(color(separator('─')));
-        lines.push('');
-      }
-
-      lines.push(await formatFinding(finding, result.projectPath));
+  for (let i = 0; i < sortedFindings.length; i++) {
+    const finding = sortedFindings[i];
+    lines.push(...(await formatFinding(finding, verbose)));
+    if (i < sortedFindings.length - 1) {
       lines.push('');
     }
   }
 
-  const criticalHigh = criticalCount + highCount;
-  const medium = mediumCount;
-  const lowInfo = (bySeverity.get(Severity.Low)?.length ?? 0) + (bySeverity.get(Severity.Info)?.length ?? 0);
-  const checkedFiles = inferCheckedFileCount(result);
+  if (sortedFindings.length > 0) {
+    lines.push('');
+  }
 
-  lines.push(c.dim(separator('━')));
-  lines.push(`Checked ${checkedFiles} files in ${result.duration}ms`);
-  lines.push('');
-  lines.push(
-    `  ${c.red(`✖ ${criticalHigh} critical/high`)}    ${c.yellow(`⚠ ${medium} medium`)}    ${c.blue(`ℹ ${lowInfo} low/info`)}`
-  );
+  const parts: string[] = [];
+  if (errorCount > 0) parts.push(c.red(`${errorCount} error${errorCount === 1 ? '' : 's'}`));
+  if (warningCount > 0) parts.push(c.yellow(`${warningCount} warning${warningCount === 1 ? '' : 's'}`));
+  if (parts.length === 0) parts.push(c.green('No issues found'));
+  lines.push(parts.join(' \u00b7 '));
+
+  if (errorCount > 0) {
+  }
 
   return lines.join('\n');
 }
