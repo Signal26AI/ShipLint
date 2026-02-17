@@ -125,6 +125,14 @@ function inferCheckedFileCount(result: ScanResult): number {
   return Math.max(locations.size, 1);
 }
 
+function getTerminalWidth(): number {
+  return Math.min(process.stdout.columns || 80, 100);
+}
+
+function separator(char: string): string {
+  return char.repeat(getTerminalWidth());
+}
+
 async function formatFinding(finding: Finding, projectPath: string): Promise<string> {
   const c = await getChalk();
   const severityColor = getSeverityColor(finding.severity);
@@ -228,21 +236,22 @@ export async function formatText(result: ScanResult): Promise<string> {
   const mediumCount = bySeverity.get(Severity.Medium)?.length ?? 0;
 
   // ═══ SHIP VERDICT ═══
-  // NOT READY only when CRITICAL findings exist
-  // REVIEW when HIGH or MEDIUM findings exist (no CRITICAL)
-  // PASS otherwise (only LOW/INFO, or no findings)
   if (criticalCount > 0) {
-    lines.push(c.red.bold('═'.repeat(60)));
-    lines.push(c.red.bold(`  ❌  NOT READY — ${criticalCount} critical issue(s) found${suppressedSuffix}`));
-    lines.push(c.red.bold('═'.repeat(60)));
-  } else if (highCount > 0 || mediumCount > 0) {
-    lines.push(c.yellow.bold('═'.repeat(60)));
-    lines.push(c.yellow.bold(`  ⚠️  REVIEW — ${result.findings.length} issue(s) found (no critical)${suppressedSuffix}`));
-    lines.push(c.yellow.bold('═'.repeat(60)));
+    lines.push(c.red.bold(separator('═')));
+    lines.push(c.red.bold(`  🚫 BLOCKED — ${criticalCount} issue(s) will cause App Store rejection${suppressedSuffix}`));
+    lines.push(c.red.bold(separator('═')));
+  } else if (highCount > 0) {
+    lines.push(c.yellow.bold(separator('═')));
+    lines.push(c.yellow.bold(`  ⚠️ WARNING — ${highCount} issue(s) likely to cause rejection${suppressedSuffix}`));
+    lines.push(c.yellow.bold(separator('═')));
+  } else if (result.findings.length > 0) {
+    lines.push(c.blue.bold(separator('═')));
+    lines.push(c.blue.bold(`  💡 ${result.findings.length} suggestion(s) to improve your submission${suppressedSuffix}`));
+    lines.push(c.blue.bold(separator('═')));
   } else {
-    lines.push(c.green.bold('═'.repeat(60)));
-    lines.push(c.green.bold(`  ✅  PASS — 0 critical issues. Your app looks ready for review.${suppressedSuffix}`));
-    lines.push(c.green.bold('═'.repeat(60)));
+    lines.push(c.green.bold(separator('═')));
+    lines.push(c.green.bold(`  ✅ READY — No issues found${suppressedSuffix}`));
+    lines.push(c.green.bold(separator('═')));
   }
 
   const sortedFindings = [...result.findings].sort((a, b) => {
@@ -259,9 +268,9 @@ export async function formatText(result: ScanResult): Promise<string> {
         const color = getSeverityColor(currentSeverity);
         const count = bySeverity.get(currentSeverity)?.length ?? 0;
         lines.push('');
-        lines.push(color(`${'─'.repeat(60)}`));
+        lines.push(color(separator('─')));
         lines.push(color(`  ${currentSeverity.toUpperCase()} (${count})`));
-        lines.push(color(`${'─'.repeat(60)}`));
+        lines.push(color(separator('─')));
         lines.push('');
       }
 
@@ -275,7 +284,7 @@ export async function formatText(result: ScanResult): Promise<string> {
   const lowInfo = (bySeverity.get(Severity.Low)?.length ?? 0) + (bySeverity.get(Severity.Info)?.length ?? 0);
   const checkedFiles = inferCheckedFileCount(result);
 
-  lines.push(c.dim('━'.repeat(40)));
+  lines.push(c.dim(separator('━')));
   lines.push(`Checked ${checkedFiles} files in ${result.duration}ms`);
   lines.push('');
   lines.push(
