@@ -53,7 +53,7 @@ export const MissingMicrophonePurposeRule: Rule = {
     // should not be flagged for microphone permission.
     // AVFoundation-only: skip if we found source files and none use mic APIs
     const hasAnySourceSignal = sourceUsage.hasAVFoundationImport || sourceUsage.hasPlaybackUsage || sourceUsage.hasCameraSpecificUsage;
-    if (hasOnlyAVFoundation && !hasMicrophoneSpecificUsage && hasAnySourceSignal) {
+    if (hasOnlyAVFoundation && !hasMicrophoneSpecificUsage && !hasCameraSpecificUsage && hasAnySourceSignal) {
       return [];
     }
 
@@ -97,13 +97,16 @@ export const MissingMicrophonePurposeRule: Rule = {
       }
     }
 
-    const confidenceLevel = hasMicrophoneSpecificUsage
+    // Camera capture APIs (AVCaptureSession etc.) almost always record audio too
+    const impliesMicrophone = hasMicrophoneSpecificUsage || hasCameraSpecificUsage;
+
+    const confidenceLevel = impliesMicrophone
       ? Confidence.High
       : hasOnlyAVFoundation
         ? Confidence.Medium
         : Confidence.High;
 
-    const findingSeverity = hasMicrophoneSpecificUsage
+    const findingSeverity = impliesMicrophone
       ? Severity.Critical
       : hasOnlyAVFoundation
         ? Severity.Medium
