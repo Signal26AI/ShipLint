@@ -112,9 +112,8 @@ describe('MissingMicrophonePurposeRule', () => {
 
     const findings = await MissingMicrophonePurposeRule.evaluate(context);
 
-    expect(findings).toHaveLength(0);
-    // expect(findings[0].severity).toBe(Severity.Medium);
-    // expect(findings[0].confidence).toBe(Confidence.Medium);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe(Severity.Medium);
   });
 
   it('should find empty NSMicrophoneUsageDescription', async () => {

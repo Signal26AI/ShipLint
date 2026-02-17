@@ -50,10 +50,8 @@ export const MissingCameraPurposeRule: Rule = {
       return [];
     }
 
-    // AVFoundation-only: skip if we found source files and none use camera APIs
-    // If no source files found at all, warn (we can't determine usage)
-    const hasAnySourceSignal = sourceUsage.hasAVFoundationImport || sourceUsage.hasPlaybackUsage || sourceUsage.hasMicrophoneSpecificUsage;
-    if (hasOnlyAVFoundation && !hasCameraSpecificUsage && hasAnySourceSignal) {
+    // AVFoundation-only: only skip if we positively detected playback-only usage
+    if (hasOnlyAVFoundation && !hasCameraSpecificUsage && hasPlaybackOnlyUsage) {
       return [];
     }
 

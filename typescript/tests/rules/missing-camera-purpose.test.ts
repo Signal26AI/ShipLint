@@ -100,7 +100,7 @@ describe('MissingCameraPurposeRule', () => {
     expect(findings).toEqual([]);
   });
 
-  it('should skip AVFoundation-only when source only has import (no specific APIs)', async () => {
+  it('should warn Medium for AVFoundation-only when source only has import', async () => {
     const projectPath = createTempProject('import AVFoundation\n');
 
     const context = createContextObject(
@@ -113,7 +113,8 @@ describe('MissingCameraPurposeRule', () => {
 
     const findings = await MissingCameraPurposeRule.evaluate(context);
 
-    expect(findings).toHaveLength(0);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe(Severity.Medium);
   });
 
   it('should find empty NSCameraUsageDescription', async () => {
