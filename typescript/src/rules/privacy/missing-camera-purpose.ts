@@ -65,9 +65,7 @@ export const MissingCameraPurposeRule: Rule = {
 
     const severityLevel = hasCameraSpecificUsage
       ? Severity.Critical
-      : hasOnlyAVFoundation
-        ? Severity.High
-        : this.severity;
+      : Severity.Medium;
 
     const sourceEvidence = hasCameraSpecificUsage && sourceUsage.cameraEvidence.length > 0
       ? ` Source analysis detected camera APIs: ${sourceUsage.cameraEvidence.slice(0, 3).join(', ')}.`

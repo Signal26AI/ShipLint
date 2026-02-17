@@ -106,7 +106,7 @@ export const MissingMicrophonePurposeRule: Rule = {
     const findingSeverity = hasMicrophoneSpecificUsage
       ? Severity.Critical
       : hasOnlyAVFoundation
-        ? Severity.High
+        ? Severity.Medium
         : this.severity;
 
     const frameworksToReport = hasAVFoundation

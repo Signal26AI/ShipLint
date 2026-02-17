@@ -113,7 +113,7 @@ describe('MissingMicrophonePurposeRule', () => {
     const findings = await MissingMicrophonePurposeRule.evaluate(context);
 
     expect(findings).toHaveLength(0);
-    // expect(findings[0].severity).toBe(Severity.High);
+    // expect(findings[0].severity).toBe(Severity.Medium);
     // expect(findings[0].confidence).toBe(Confidence.Medium);
   });
 
@@ -199,7 +199,7 @@ describe('MissingMicrophonePurposeRule', () => {
 
     // No source files = can't determine usage = warn
     expect(findings.length).toBeGreaterThanOrEqual(1);
-    expect(findings[0].severity).toBe(Severity.High);
+    expect(findings[0].severity).toBe(Severity.Medium);
     expect(findings[0].confidence).toBe(Confidence.Medium);
   });
 
