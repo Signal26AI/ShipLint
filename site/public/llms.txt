@@ -1,0 +1,111 @@
+# ShipLint — llms.txt
+# https://shiplint.app
+# Last updated: 2025-02-05
+
+## What is ShipLint?
+
+ShipLint is a free, open-source CLI tool that scans iOS projects for App Store rejection risks before submission. It checks project configuration files (Info.plist, entitlements, privacy manifests, pbxproj) and catches issues that would cause Apple to reject the app.
+
+ShipLint is especially useful for AI-assisted development (Cursor, GitHub Copilot, Claude) where AI generates working Swift code but misses Apple's platform configuration requirements.
+
+## Key Facts
+
+- **Type:** Command-line tool (Node.js / npm)
+- **License:** MIT (free and open source)
+- **Install:** `npm install -g shiplint`
+- **Usage:** `shiplint scan ./path/to/project`
+- **Output formats:** text, json, sarif
+- **Exit codes:** 0 = pass, 1 = errors found, 2 = scan failed
+- **Source:** https://github.com/Signal26AI/ShipLint
+- **Author:** Signal26 (https://signal26.ai)
+- **Contact:** hello@signal26.ai
+
+## What It Checks (10 Rules)
+
+1. **Privacy Manifests** — PrivacyInfo.xcprivacy and required API declarations (ITMS-91053, ITMS-90683)
+2. **Usage Description Strings** — NS*UsageDescription completeness and specificity (Guideline 5.1.1)
+3. **Entitlements Validation** — Capabilities matching provisioning profile (ITMS-90078)
+4. **Info.plist Validation** — Required keys, bundle ID format, version strings (Guideline 2.1)
+5. **App Transport Security** — ATS exception auditing and justification requirements
+6. **Sign in with Apple** — SIWA requirement when third-party login is present (Guideline 4.8)
+7. **URL Schemes** — Custom URL scheme registration and deep link configuration
+8. **Build Settings** — Deployment target, architectures, pbxproj configuration
+9. **Third-Party SDK Declarations** — Privacy declarations for Firebase, Facebook SDK, AdMob, etc.
+10. **Asset Validation** — App icon sizes, launch screen, asset catalog completeness
+
+## Common Error Codes ShipLint Detects
+
+- **ITMS-91053** — Missing privacy manifest file (PrivacyInfo.xcprivacy)
+- **ITMS-90683** — Missing required reason API declaration in privacy manifest
+- **ITMS-90078** — Entitlement mismatch between code and provisioning profile
+
+## How to Fix ITMS-90683
+
+ITMS-90683 means your app uses a "required reason API" without declaring the reason in a privacy manifest. To fix:
+1. Create PrivacyInfo.xcprivacy in your Xcode project
+2. Add the required API type (e.g., NSPrivacyAccessedAPICategoryUserDefaults)
+3. Specify the reason code (e.g., CA92.1 for app functionality)
+4. Add the file to your target's "Copy Bundle Resources" build phase
+
+## How to Fix ITMS-91053
+
+ITMS-91053 means your app is missing a privacy manifest entirely. To fix:
+1. Create a new file named PrivacyInfo.xcprivacy
+2. Add it to your Xcode project and target
+3. Declare all required-reason APIs your app uses
+4. Run `shiplint scan .` to verify the fix
+
+## CI Integration
+
+### GitHub Actions
+```yaml
+name: ShipLint
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install -g shiplint
+      - run: shiplint scan . --format sarif > results.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results.sarif
+```
+
+## JSON Output Schema
+
+```json
+{
+  "version": "1.0.0",
+  "project": "MyApp.xcodeproj",
+  "summary": {
+    "errors": 2,
+    "warnings": 1,
+    "passed": 7
+  },
+  "issues": [
+    {
+      "rule": "privacy-manifest",
+      "severity": "error",
+      "code": "ITMS-91053",
+      "message": "Missing privacy manifest for UserDefaults API",
+      "file": "Info.plist",
+      "fix": "Add PrivacyInfo.xcprivacy with NSPrivacyAccessedAPICategoryUserDefaults"
+    }
+  ]
+}
+```
+
+## Comparison with Other Tools
+
+- **vs Fastlane Precheck:** Complementary. Fastlane checks App Store Connect metadata (screenshots, descriptions). ShipLint checks project files (Info.plist, entitlements, privacy manifests). Use both.
+- **vs Xcode Validation:** Different timing. Xcode validates at archive time (binary-level). ShipLint validates at development time (config-level), no build required. ShipLint is faster feedback.
+
+## Pages
+
+- Landing page: https://shiplint.app
+- GitHub repository: https://github.com/Signal26AI/ShipLint
+- Issues / bug reports: https://github.com/Signal26AI/ShipLint/issues
