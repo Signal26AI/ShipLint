@@ -44,54 +44,50 @@ function makeResult(findings: Finding[]): ScanResult {
 }
 
 describe('Verdict banner logic', () => {
-  test('INFO-only findings → PASS (never NOT READY)', async () => {
+  test('CRITICAL findings → BLOCKED', async () => {
     const result = makeResult([
-      makeFinding({ severity: Severity.Info, ruleId: 'code-002', title: 'Stripe SDK detected' }),
+      makeFinding({ severity: Severity.Critical, title: 'Critical problem' }),
     ]);
     const output = await formatText(result);
-    expect(output).toContain('PASS');
-    expect(output).not.toContain('NOT READY');
+    expect(output).toContain('🚫 BLOCKED');
+    expect(output).toContain('will cause App Store rejection');
   });
 
-  test('MEDIUM findings, no CRITICAL → REVIEW (never NOT READY)', async () => {
-    const result = makeResult([
-      makeFinding({ severity: Severity.Medium, title: 'Some medium issue' }),
-    ]);
-    const output = await formatText(result);
-    expect(output).toContain('REVIEW');
-    expect(output).not.toContain('NOT READY');
-  });
-
-  test('HIGH findings, no CRITICAL → REVIEW (never NOT READY)', async () => {
+  test('HIGH findings without CRITICAL → WARNING', async () => {
     const result = makeResult([
       makeFinding({ severity: Severity.High, title: 'Some high issue' }),
     ]);
     const output = await formatText(result);
-    expect(output).toContain('REVIEW');
-    expect(output).not.toContain('NOT READY');
+    expect(output).toContain('⚠️ WARNING');
+    expect(output).toContain('likely to cause rejection');
+    expect(output).not.toContain('🚫 BLOCKED');
   });
 
-  test('CRITICAL finding → NOT READY', async () => {
+  test('MEDIUM/LOW/INFO only → suggestions', async () => {
     const result = makeResult([
-      makeFinding({ severity: Severity.Critical, title: 'Critical problem' }),
+      makeFinding({ severity: Severity.Medium, title: 'Some medium issue' }),
+      makeFinding({ severity: Severity.Info, title: 'Some info issue' }),
     ]);
     const output = await formatText(result);
-    expect(output).toContain('NOT READY');
+    expect(output).toContain('💡 2 suggestion(s) to improve your submission');
+    expect(output).not.toContain('⚠️ WARNING');
+    expect(output).not.toContain('🚫 BLOCKED');
   });
 
-  test('mixed INFO + CRITICAL → NOT READY', async () => {
-    const result = makeResult([
-      makeFinding({ severity: Severity.Info, title: 'Just info' }),
-      makeFinding({ severity: Severity.Critical, title: 'Critical problem' }),
-    ]);
-    const output = await formatText(result);
-    expect(output).toContain('NOT READY');
-  });
-
-  test('no findings → PASS', async () => {
+  test('no findings → READY', async () => {
     const result = makeResult([]);
     const output = await formatText(result);
-    expect(output).toContain('PASS');
-    expect(output).not.toContain('NOT READY');
+    expect(output).toContain('✅ READY — No issues found');
+  });
+
+  test('separator width follows terminal width and caps at 100', async () => {
+    const original = process.stdout.columns;
+    try {
+      Object.defineProperty(process.stdout, 'columns', { value: 140, configurable: true });
+      const output = await formatText(makeResult([makeFinding({ severity: Severity.High })]));
+      expect(output).toContain('═'.repeat(100));
+    } finally {
+      Object.defineProperty(process.stdout, 'columns', { value: original, configurable: true });
+    }
   });
 });

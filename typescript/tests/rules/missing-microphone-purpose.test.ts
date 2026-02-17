@@ -105,7 +105,7 @@ describe('MissingMicrophonePurposeRule', () => {
     expect(findings.some(f => f.title === 'Missing Microphone Usage Description')).toBe(true);
   });
 
-  it('should detect AVFoundation as potential microphone user', async () => {
+  it('should detect AVFoundation as potential microphone user with downgraded severity', async () => {
     const context = createContextObject(
       '/test/project',
       { CFBundleIdentifier: 'com.example.app' },
@@ -115,9 +115,11 @@ describe('MissingMicrophonePurposeRule', () => {
     );
 
     const findings = await MissingMicrophonePurposeRule.evaluate(context);
-    
-    // AVFoundation can use microphone for recording
+
+    // AVFoundation can use microphone for recording, but this is not guaranteed.
     expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].severity).toBe(Severity.High);
+    expect(findings[0].confidence).toBe(Confidence.Medium);
   });
 
   it('should return no findings for AVFoundation when valid mic description exists', async () => {
