@@ -255,6 +255,9 @@ export async function formatText(result: ScanResult, options: TextFormatOptions 
 
   const lines: string[] = [];
   lines.push(`ShipLint v${version} — scanning ${displayProjectName(result.projectPath)}`);
+  if (verbose) {
+    lines.push(c.dim(`  ${result.timestamp.toISOString()} · ${result.duration}ms · ${result.rulesRun.length} rules`));
+  }
   lines.push('');
 
 
