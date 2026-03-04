@@ -122,7 +122,7 @@ export function parsePbxprojTargets(content: string): PbxprojTarget[] {
   // Match PBXNativeTarget section entries
   // Format: ID /* Name */ = { isa = PBXNativeTarget; ... };
   // This regex captures the full target block
-  const targetRegex = /([A-Fa-f0-9]{24})\s*\/\*\s*([^*]+?)\s*\*\/\s*=\s*\{([^}]*isa\s*=\s*PBXNativeTarget[^}]*(?:\{[^}]*\}[^}]*)*)\};/g;
+  const targetRegex = /([A-Za-z0-9]+)\s*\/\*\s*([^*]+?)\s*\*\/\s*=\s*\{([^}]*isa\s*=\s*PBXNativeTarget[^}]*(?:\{[^}]*\}[^}]*)*)\};/g;
   
   let match;
   while ((match = targetRegex.exec(content)) !== null) {
@@ -135,7 +135,7 @@ export function parsePbxprojTargets(content: string): PbxprojTarget[] {
     const productType = productTypeMatch ? productTypeMatch[1] : '';
     
     // Extract buildConfigurationList
-    const configListMatch = block.match(/buildConfigurationList\s*=\s*([A-Fa-f0-9]{24})/);
+    const configListMatch = block.match(/buildConfigurationList\s*=\s*([A-Za-z0-9]+)/);
     const buildConfigurationListId = configListMatch ? configListMatch[1] : '';
     
     // Extract productName if present
@@ -241,7 +241,7 @@ export function parseBuildConfigurations(content: string): Map<string, PbxprojBu
   
   // Find XCBuildConfiguration entries using a brace-counting parser instead of regex
   // This handles values containing } inside quoted strings (e.g., ${PRODUCT_NAME:rfc1034identifier})
-  const isaPattern = /([A-Fa-f0-9]{24})\s*\/\*\s*([^*]+?)\s*\*\/\s*=\s*\{/g;
+  const isaPattern = /([A-Za-z0-9]+)\s*\/\*\s*([^*]+?)\s*\*\/\s*=\s*\{/g;
   
   let isaMatch;
   while ((isaMatch = isaPattern.exec(content)) !== null) {
@@ -328,7 +328,7 @@ export function parseConfigurationLists(content: string): Map<string, PbxprojCon
   
   // Match XCConfigurationList entries
   // Format: ID /* ... */ = { isa = XCConfigurationList; buildConfigurations = ( ID1, ID2, ); ... };
-  const listRegex = /([A-Fa-f0-9]{24})\s*\/\*[^*]*\*\/\s*=\s*\{[^}]*isa\s*=\s*XCConfigurationList[^}]*buildConfigurations\s*=\s*\(([^)]+)\)/g;
+  const listRegex = /([A-Za-z0-9]+)\s*\/\*[^*]*\*\/\s*=\s*\{[^}]*isa\s*=\s*XCConfigurationList[^}]*buildConfigurations\s*=\s*\(([^)]+)\)/g;
   
   let match;
   while ((match = listRegex.exec(content)) !== null) {
@@ -337,7 +337,7 @@ export function parseConfigurationLists(content: string): Map<string, PbxprojCon
     
     // Extract config IDs
     const configIds: string[] = [];
-    const idRegex = /([A-Fa-f0-9]{24})/g;
+    const idRegex = /([A-Za-z0-9]+)\s*\/\*/g;
     let idMatch;
     while ((idMatch = idRegex.exec(configsBlock)) !== null) {
       configIds.push(idMatch[1]);

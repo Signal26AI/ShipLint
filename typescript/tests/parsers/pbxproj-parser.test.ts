@@ -153,6 +153,24 @@ describe('pbxproj-parser', () => {
       expect(targets[0].id).toBe('A1b2C3d4E5f6A1b2C3d4E5f6');
       expect(targets[0].buildConfigurationListId).toBe('D1e2F3a4B5c6D1e2F3a4B5c6');
     });
+
+    it('should parse targets with alphanumeric IDs', () => {
+      const content = `
+/* Begin PBXNativeTarget section */
+    A1000001 /* EdoTime */ = {
+      isa = PBXNativeTarget;
+      buildConfigurationList = A7000003;
+      name = EdoTime;
+      productType = "com.apple.product-type.application";
+    };
+/* End PBXNativeTarget section */`;
+
+      const targets = parsePbxprojTargets(content);
+
+      expect(targets).toHaveLength(1);
+      expect(targets[0].id).toBe('A1000001');
+      expect(targets[0].buildConfigurationListId).toBe('A7000003');
+    });
   });
 
   describe('getMainAppTarget', () => {
@@ -399,6 +417,24 @@ describe('pbxproj-parser', () => {
       const debug = configs.get('a1a1a1a1a1a1a1a1a1a1a1a1');
       expect(debug?.name).toBe('Debug');
     });
+
+    it('should parse configs with alphanumeric IDs', () => {
+      const content = `
+/* Begin XCBuildConfiguration section */
+    A7000004 /* Debug */ = {
+      isa = XCBuildConfiguration;
+      buildSettings = {
+        INFOPLIST_FILE = "EdoTime/Info.plist";
+      };
+      name = Debug;
+    };
+/* End XCBuildConfiguration section */`;
+
+      const configs = parseBuildConfigurations(content);
+
+      expect(configs.size).toBe(1);
+      expect(configs.get('A7000004')?.name).toBe('Debug');
+    });
   });
 
   describe('parseConfigurationLists', () => {
@@ -446,6 +482,27 @@ describe('pbxproj-parser', () => {
       expect(list?.buildConfigurationIds).toEqual([
         'a1a1a1a1a1a1a1a1a1a1a1a1',
         'b2b2b2b2b2b2b2b2b2b2b2b2',
+      ]);
+    });
+
+    it('should parse configuration lists with alphanumeric IDs', () => {
+      const content = `
+/* Begin XCConfigurationList section */
+    A7000003 /* Build configuration list for PBXNativeTarget "EdoTime" */ = {
+      isa = XCConfigurationList;
+      buildConfigurations = (
+        A7000004 /* Debug */,
+        A7000005 /* Release */,
+      );
+    };
+/* End XCConfigurationList section */`;
+
+      const lists = parseConfigurationLists(content);
+
+      expect(lists.size).toBe(1);
+      expect(lists.get('A7000003')?.buildConfigurationIds).toEqual([
+        'A7000004',
+        'A7000005',
       ]);
     });
   });
