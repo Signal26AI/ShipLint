@@ -11,6 +11,7 @@
     "start": "node dist/cli/index.js",
     "dev": "tsx src/cli/index.ts",
     "test": "jest",
+    "test:integration": "jest --config jest.integration.config.js",
     "test:watch": "jest --watch",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
